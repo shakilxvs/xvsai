@@ -1,5 +1,10 @@
 export type Mode = 'chat' | 'deep' | 'fast' | 'research' | 'code' | 'image';
 
+export interface Source {
+  title: string;
+  url: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -8,6 +13,9 @@ export interface Message {
   model?: string;
   provider?: string;
   timestamp: Date;
+  imageUrl?: string;
+  imageLoading?: boolean;
+  sources?: Source[];
 }
 
 export interface ModeConfig {
