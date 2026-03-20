@@ -1,10 +1,23 @@
 'use client';
 import { PanelLeft } from 'lucide-react';
 import { ModeConfig } from '@/app/lib/types';
+import { User } from 'firebase/auth';
+import AuthButton from './AuthButton';
 
-export default function Header({ currentMode, sidebarOpen, onToggle }: {
-  currentMode: ModeConfig; sidebarOpen: boolean; onToggle: () => void;
-}) {
+interface Props {
+  currentMode: ModeConfig;
+  sidebarOpen: boolean;
+  onToggle: () => void;
+  user: User | null;
+  authLoading: boolean;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}
+
+export default function Header({
+  currentMode, sidebarOpen, onToggle,
+  user, authLoading, onSignIn, onSignOut,
+}: Props) {
   return (
     <header
       className="flex-shrink-0 flex items-center px-4 gap-3 z-20"
@@ -30,11 +43,13 @@ export default function Header({ currentMode, sidebarOpen, onToggle }: {
         >
           X
         </div>
-        <span className="text-[14px] font-semibold tracking-tight hidden sm:block" style={{ color: 'rgba(255,255,255,0.65)' }}>
+        <span className="text-[14px] font-semibold tracking-tight hidden sm:block"
+          style={{ color: 'rgba(255,255,255,0.65)' }}>
           XVSai
         </span>
       </div>
 
+      {/* Mode badge — centered */}
       <div className="flex-1 flex justify-center">
         <div
           className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-500"
@@ -48,9 +63,18 @@ export default function Header({ currentMode, sidebarOpen, onToggle }: {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span className="text-[11px] hidden sm:block" style={{ color: 'rgba(255,255,255,0.18)' }}>Online</span>
+      {/* Right: status + auth */}
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.18)' }}>Online</span>
+        </div>
+        <AuthButton
+          user={user}
+          loading={authLoading}
+          onSignIn={onSignIn}
+          onSignOut={onSignOut}
+        />
       </div>
     </header>
   );
