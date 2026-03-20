@@ -26,63 +26,68 @@ export default function WelcomeScreen({ currentMode, onSuggestion, onModeChange 
   onModeChange: (m: Mode) => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6 py-8 overflow-y-auto">
+    <div className="flex flex-col items-center justify-start md:justify-center h-full px-4 py-6 overflow-y-auto">
 
       {/* Hero */}
-      <div className="text-center mb-10 anim-up">
-        <div className="relative w-14 h-14 mx-auto mb-6">
-          <div
-            className="absolute inset-0 rounded-2xl blur-2xl opacity-50 transition-all duration-700"
-            style={{ background: currentMode.gradient }}
-          />
-          <div
-            className="relative w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold text-white transition-all duration-700"
-            style={{ background: currentMode.gradient, border: '1px solid rgba(255,255,255,0.18)' }}
-          >
+      <div className="text-center mb-7 anim-up w-full">
+        <div className="relative w-12 h-12 md:w-14 md:h-14 mx-auto mb-5">
+          <div className="absolute inset-0 rounded-2xl blur-2xl opacity-50 transition-all duration-700"
+            style={{ background: currentMode.gradient }} />
+          <div className="relative w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-lg font-bold text-white transition-all duration-700"
+            style={{ background: currentMode.gradient, border: '1px solid rgba(255,255,255,0.18)' }}>
             X
           </div>
         </div>
-        <h1 className="text-[30px] font-semibold tracking-tight text-white mb-2.5">
+        <h1 className="text-[24px] md:text-[30px] font-semibold tracking-tight text-white mb-2">
           What can I help with?
         </h1>
-        <p className="text-[13px] max-w-[300px] mx-auto leading-relaxed" style={{ color: 'rgba(255,255,255,0.26)' }}>
-          Select a mode below and start your conversation. Powered by multiple free AI models.
+        <p className="text-[13px] max-w-[280px] mx-auto leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          Select a mode and start your conversation.
         </p>
       </div>
 
-      {/* Mode pills */}
-      <div className="flex flex-wrap justify-center gap-2 mb-9 anim-up-1">
-        {MODES.map(m => {
-          const active = currentMode.id === m.id;
-          return (
-            <button
-              key={m.id}
-              onClick={() => onModeChange(m.id)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all duration-150"
-              style={active
-                ? { background: `${m.accent}18`, color: m.accent, border: `1px solid ${m.accent}32` }
-                : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.26)', border: '1px solid rgba(255,255,255,0.07)' }
-              }
-            >
-              {ICONS[m.id]}
-              {m.label}
-            </button>
-          );
-        })}
+      {/* Mode pills — horizontal scroll on mobile */}
+      <div className="w-full mb-6 anim-up-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 px-0 hide-scrollbar"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {MODES.map(m => {
+            const active = currentMode.id === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => onModeChange(m.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150 flex-shrink-0"
+                style={active
+                  ? { background: `${m.accent}20`, color: m.accent, border: `1px solid ${m.accent}35` }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.08)' }
+                }
+              >
+                {ICONS[m.id]}
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Suggestion cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-[500px] anim-up-2">
+      {/* Suggestion cards — 1 col mobile, 2 col desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-[500px] anim-up-2">
         {PROMPTS.map((p, i) => {
           const m = MODES.find(mo => mo.id === p.mode)!;
           return (
             <button
               key={i}
               onClick={() => { onModeChange(p.mode); onSuggestion(p.text); }}
-              className="group flex items-start justify-between gap-3 p-4 rounded-xl text-left transition-all duration-200 hover:scale-[1.015]"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = `${m.accent}28`; (e.currentTarget as HTMLElement).style.background = `${m.accent}07`; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
+              className="group flex items-start justify-between gap-3 p-4 rounded-xl text-left transition-all duration-200 active:scale-[0.98]"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = `${m.accent}30`;
+                (e.currentTarget as HTMLElement).style.background = `${m.accent}08`;
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)';
+                (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
+              }}
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 mb-1.5">
@@ -91,16 +96,13 @@ export default function WelcomeScreen({ currentMode, onSuggestion, onModeChange 
                     {m.label}
                   </span>
                 </div>
-                <p className="text-[12.5px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.36)' }}>
+                <p className="text-[13px] leading-snug" style={{ color: 'rgba(255,255,255,0.55)' }}>
                   {p.text}
                 </p>
               </div>
-              <span
+              <ArrowRight size={12} strokeWidth={2}
                 className="mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
-                style={{ color: m.accent }}
-              >
-                <ArrowRight size={12} strokeWidth={2} />
-              </span>
+                style={{ color: m.accent }} />
             </button>
           );
         })}
