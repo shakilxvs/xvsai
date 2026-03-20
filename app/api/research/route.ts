@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 interface TavilyResult {
   title: string;
   url: string;
@@ -33,14 +38,24 @@ async function searchTavily(query: string, apiKey: string): Promise<{ results: T
 async function synthesizeWithGroq(
   query: string,
   context: string,
+  history: ChatMessage[],
   apiKey: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const systemPrompt = `You are XVSai in Research mode. You have been given web search results. 
+
+  const systemPrompt = `You are XVSai in Research mode. You have been given web search results.
 Synthesize them into a clear, well-structured answer with markdown formatting.
+You also have access to the previous conversation history — use it to understand context and references like "me", "my name", "that topic", etc.
 Always end with a brief "Sources" section referencing what you found.
 Be accurate and cite specific facts from the search results.`;
 
-  const userMessage = `Query: ${query}\n\nSearch Results:\n${context}\n\nPlease provide a comprehensive answer based on these results.`;
+  // Build messages: history first, then the current research request
+  const messages: ChatMessage[] = [
+    ...history.slice(-8), // last 8 messages for context, avoids token limits
+    {
+      role: 'user',
+      content: `Search query: ${query}\n\nSearch Results:\n${context}\n\nPlease provide a comprehensive answer.`,
+    },
+  ];
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -50,10 +65,7 @@ Be accurate and cite specific facts from the search results.`;
     },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
       stream: true,
       max_tokens: 1500,
       temperature: 0.3,
@@ -67,8 +79,21 @@ Be accurate and cite specific facts from the search results.`;
 async function synthesizeWithGemini(
   query: string,
   context: string,
+  history: ChatMessage[],
   apiKey: string,
 ): Promise<string> {
+  // Build contents with history
+  const contents = [
+    ...history.slice(-6).map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+    {
+      role: 'user',
+      parts: [{ text: `Search query: ${query}\n\nSearch Results:\n${context}\n\nProvide a comprehensive answer.` }],
+    },
+  ];
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     {
@@ -76,12 +101,9 @@ async function synthesizeWithGemini(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: 'You are XVSai in Research mode. Synthesize search results into a clear markdown answer.' }],
+          parts: [{ text: 'You are XVSai in Research mode. Use conversation history for context. Synthesize search results into a clear markdown answer.' }],
         },
-        contents: [{
-          role: 'user',
-          parts: [{ text: `Query: ${query}\n\nSearch Results:\n${context}\n\nProvide a comprehensive answer.` }],
-        }],
+        contents,
         generationConfig: { maxOutputTokens: 1500, temperature: 0.3 },
       }),
     }
@@ -93,7 +115,11 @@ async function synthesizeWithGemini(
 
 export async function POST(req: NextRequest) {
   try {
-    const { query }: { query: string } = await req.json();
+    const {
+      query,
+      messages = [],
+    }: { query: string; messages?: ChatMessage[] } = await req.json();
+
     if (!query) return NextResponse.json({ error: 'No query provided' }, { status: 400 });
 
     const tavilyKey = process.env.TAVILY_API_KEY;
@@ -112,40 +138,32 @@ export async function POST(req: NextRequest) {
           .slice(0, 4)
           .map((r, i) => `[${i + 1}] ${r.title}\n${r.content}`)
           .join('\n\n');
-      } catch (e) {
-        // Search failed — fall through to AI-only answer
+      } catch {
+        context = 'Web search unavailable. Answer from training knowledge and be transparent.';
       }
+    } else {
+      context = 'No web search key configured. Answer from training knowledge.';
     }
 
-    // If no search results, answer from AI knowledge
-    if (!context) {
-      context = 'No web search results available. Answer from your training knowledge and be transparent about this.';
-    }
-
-    // ── Step 2: Synthesize with AI ─────────────────────────
-    // Try streaming with Groq first
+    // ── Step 2: Synthesize with conversation history ───────
     if (groqKey) {
       try {
-        const stream = await synthesizeWithGroq(query, context, groqKey);
-
-        // Encode sources as a header
-        const sourcesHeader = encodeURIComponent(JSON.stringify(sources));
-
+        const stream = await synthesizeWithGroq(query, context, messages, groqKey);
         return new Response(stream, {
           headers: {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
             'X-Model': 'llama-3.3-70b-versatile',
             'X-Provider': 'Groq + Tavily',
-            'X-Sources': sourcesHeader,
+            'X-Sources': encodeURIComponent(JSON.stringify(sources)),
           },
         });
       } catch { /* fall through */ }
     }
 
-    // Fallback: Gemini (non-streaming)
+    // Fallback: Gemini
     if (geminiKey) {
-      const text = await synthesizeWithGemini(query, context, geminiKey);
+      const text = await synthesizeWithGemini(query, context, messages, geminiKey);
       const enc = new TextEncoder();
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
@@ -158,7 +176,6 @@ export async function POST(req: NextRequest) {
           controller.close();
         },
       });
-
       return new Response(stream, {
         headers: {
           'Content-Type': 'text/event-stream',
@@ -172,7 +189,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: 'No AI keys configured.' }, { status: 503 });
 
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ error: 'Research failed. Please try again.' }, { status: 500 });
   }
 }
