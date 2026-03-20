@@ -14,7 +14,6 @@ export function useChat() {
     autoRoute: boolean,
     detectMode: (t: string) => Mode
   ) => {
-    // Auto-route
     let activeMode = mode;
     let notice: string | null = null;
     if (autoRoute) {
@@ -27,7 +26,6 @@ export function useChat() {
     }
     setAutoRoutedTo(notice);
 
-    // Add user message
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: 'user',
@@ -40,14 +38,13 @@ export function useChat() {
 
     const aiId = `a-${Date.now()}`;
 
-    // ── IMAGE MODE ─────────────────────────────────────────
+    // ── IMAGE MODE ────────────────────────────────────────
     if (activeMode === 'image') {
       setMessages(prev => [...prev, {
         id: aiId, role: 'assistant', content: '',
         mode: activeMode, model: 'Pollinations.ai', provider: 'Free',
         imageLoading: true, timestamp: new Date(),
       }]);
-
       try {
         const res = await fetch('/api/image', {
           method: 'POST',
@@ -55,7 +52,6 @@ export function useChat() {
           body: JSON.stringify({ prompt: content }),
         });
         const data = await res.json();
-
         if (data.error) {
           setMessages(prev => prev.map(m =>
             m.id === aiId ? { ...m, content: data.error, imageLoading: false } : m
@@ -77,31 +73,27 @@ export function useChat() {
           m.id === aiId ? { ...m, content: 'Image generation failed. Please try again.', imageLoading: false } : m
         ));
       }
-
       setIsLoading(false);
       return;
     }
 
-    // ── RESEARCH MODE ──────────────────────────────────────
+    // ── RESEARCH MODE ─────────────────────────────────────
     if (activeMode === 'research') {
       setMessages(prev => [...prev, {
         id: aiId, role: 'assistant', content: '',
         mode: activeMode, model: '...', provider: 'Searching...',
         timestamp: new Date(),
       }]);
-
       abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       try {
         const res = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query: content }),
-          signal: controller.signal,
+          signal: ctrl.signal,
         });
-
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           setMessages(prev => prev.map(m =>
@@ -110,23 +102,15 @@ export function useChat() {
           setIsLoading(false);
           return;
         }
-
         const model = res.headers.get('X-Model') ?? 'AI';
         const provider = res.headers.get('X-Provider') ?? 'Research';
-        const sourcesRaw = res.headers.get('X-Sources') ?? '[]';
         let sources: Source[] = [];
-        try { sources = JSON.parse(decodeURIComponent(sourcesRaw)); } catch { /* ignore */ }
-
-        setMessages(prev => prev.map(m =>
-          m.id === aiId ? { ...m, model, provider, sources } : m
-        ));
-
-        // Stream the response
+        try { sources = JSON.parse(decodeURIComponent(res.headers.get('X-Sources') ?? '[]')); } catch {}
+        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider, sources } : m));
         const reader = res.body!.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
         let buffer = '';
-
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -141,63 +125,47 @@ export function useChat() {
             try {
               const parsed = JSON.parse(raw);
               const delta = parsed.choices?.[0]?.delta?.content ?? '';
-              if (delta) {
-                fullContent += delta;
-                setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
-              }
-            } catch { /* skip */ }
+              if (delta) { fullContent += delta; setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m)); }
+            } catch {}
           }
         }
-
       } catch (err: any) {
         if (err?.name === 'AbortError') return;
-        setMessages(prev => prev.map(m =>
-          m.id === aiId ? { ...m, content: 'Research failed. Please try again.', model: 'Error', provider: '' } : m
-        ));
+        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Research failed.', model: 'Error', provider: '' } : m));
       }
-
       setIsLoading(false);
       return;
     }
 
-    // ── ALL OTHER MODES (chat, fast, deep, code) ───────────
+    // ── CHAT / FAST / DEEP / CODE ─────────────────────────
     const apiMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
-
     setMessages(prev => [...prev, {
       id: aiId, role: 'assistant', content: '',
       mode: activeMode, model: '...', provider: '...', timestamp: new Date(),
     }]);
-
     abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages, mode: activeMode }),
-        signal: controller.signal,
+        signal: ctrl.signal,
       });
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setMessages(prev => prev.map(m =>
-          m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong.', model: 'Error', provider: '' } : m
-        ));
+        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong.', model: 'Error', provider: '' } : m));
         setIsLoading(false);
         return;
       }
-
       const model = res.headers.get('X-Model') ?? 'AI';
       const provider = res.headers.get('X-Provider') ?? '';
       setMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider } : m));
-
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
       let buffer = '';
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -212,25 +180,16 @@ export function useChat() {
           try {
             const parsed = JSON.parse(raw);
             const delta = parsed.choices?.[0]?.delta?.content ?? '';
-            if (delta) {
-              fullContent += delta;
-              setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
-            }
-          } catch { /* skip */ }
+            if (delta) { fullContent += delta; setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m)); }
+          } catch {}
         }
       }
-
       if (!fullContent.trim()) {
-        setMessages(prev => prev.map(m =>
-          m.id === aiId ? { ...m, content: 'No response received. Please try again.', model: 'Error', provider: '' } : m
-        ));
+        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'No response received.', model: 'Error', provider: '' } : m));
       }
-
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      setMessages(prev => prev.map(m =>
-        m.id === aiId ? { ...m, content: 'Connection error. Please try again.', model: 'Error', provider: '' } : m
-      ));
+      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Connection error. Please try again.', model: 'Error', provider: '' } : m));
     } finally {
       setIsLoading(false);
     }
@@ -242,5 +201,5 @@ export function useChat() {
     setAutoRoutedTo(null);
   }, []);
 
-  return { messages, isLoading, autoRoutedTo, sendMessage, clearMessages };
+  return { messages, isLoading, autoRoutedTo, sendMessage, clearMessages, setMessages };
 }
