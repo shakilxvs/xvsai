@@ -1,6 +1,6 @@
 'use client';
 import { useState, useCallback, useRef } from 'react';
-import { Message, Mode } from '@/app/lib/types';
+import { Message, Mode, Source } from '@/app/lib/types';
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -14,6 +14,7 @@ export function useChat() {
     autoRoute: boolean,
     detectMode: (t: string) => Mode
   ) => {
+    // Auto-route
     let activeMode = mode;
     let notice: string | null = null;
     if (autoRoute) {
@@ -26,6 +27,7 @@ export function useChat() {
     }
     setAutoRoutedTo(notice);
 
+    // Add user message
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: 'user',
@@ -33,16 +35,134 @@ export function useChat() {
       mode: activeMode,
       timestamp: new Date(),
     };
-
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
-    const apiMessages = [...messages, userMsg].map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
-
     const aiId = `a-${Date.now()}`;
+
+    // ── IMAGE MODE ─────────────────────────────────────────
+    if (activeMode === 'image') {
+      setMessages(prev => [...prev, {
+        id: aiId, role: 'assistant', content: '',
+        mode: activeMode, model: 'Pollinations.ai', provider: 'Free',
+        imageLoading: true, timestamp: new Date(),
+      }]);
+
+      try {
+        const res = await fetch('/api/image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: content }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          setMessages(prev => prev.map(m =>
+            m.id === aiId ? { ...m, content: data.error, imageLoading: false } : m
+          ));
+        } else {
+          setMessages(prev => prev.map(m =>
+            m.id === aiId ? {
+              ...m,
+              content: `Here's your image: **"${content}"**`,
+              imageUrl: data.imageUrl,
+              imageLoading: false,
+              model: data.provider,
+              provider: 'Phase 3',
+            } : m
+          ));
+        }
+      } catch {
+        setMessages(prev => prev.map(m =>
+          m.id === aiId ? { ...m, content: 'Image generation failed. Please try again.', imageLoading: false } : m
+        ));
+      }
+
+      setIsLoading(false);
+      return;
+    }
+
+    // ── RESEARCH MODE ──────────────────────────────────────
+    if (activeMode === 'research') {
+      setMessages(prev => [...prev, {
+        id: aiId, role: 'assistant', content: '',
+        mode: activeMode, model: '...', provider: 'Searching...',
+        timestamp: new Date(),
+      }]);
+
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const res = await fetch('/api/research', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: content }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setMessages(prev => prev.map(m =>
+            m.id === aiId ? { ...m, content: data.error ?? 'Research failed.', model: 'Error', provider: '' } : m
+          ));
+          setIsLoading(false);
+          return;
+        }
+
+        const model = res.headers.get('X-Model') ?? 'AI';
+        const provider = res.headers.get('X-Provider') ?? 'Research';
+        const sourcesRaw = res.headers.get('X-Sources') ?? '[]';
+        let sources: Source[] = [];
+        try { sources = JSON.parse(decodeURIComponent(sourcesRaw)); } catch { /* ignore */ }
+
+        setMessages(prev => prev.map(m =>
+          m.id === aiId ? { ...m, model, provider, sources } : m
+        ));
+
+        // Stream the response
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) continue;
+            const raw = trimmed.slice(5).trim();
+            if (raw === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(raw);
+              const delta = parsed.choices?.[0]?.delta?.content ?? '';
+              if (delta) {
+                fullContent += delta;
+                setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
+              }
+            } catch { /* skip */ }
+          }
+        }
+
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return;
+        setMessages(prev => prev.map(m =>
+          m.id === aiId ? { ...m, content: 'Research failed. Please try again.', model: 'Error', provider: '' } : m
+        ));
+      }
+
+      setIsLoading(false);
+      return;
+    }
+
+    // ── ALL OTHER MODES (chat, fast, deep, code) ───────────
+    const apiMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+
     setMessages(prev => [...prev, {
       id: aiId, role: 'assistant', content: '',
       mode: activeMode, model: '...', provider: '...', timestamp: new Date(),
@@ -63,7 +183,7 @@ export function useChat() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         setMessages(prev => prev.map(m =>
-          m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong. Please try again.', model: 'Error', provider: '' } : m
+          m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong.', model: 'Error', provider: '' } : m
         ));
         setIsLoading(false);
         return;
@@ -81,11 +201,9 @@ export function useChat() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
-
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed.startsWith('data:')) continue;
@@ -98,7 +216,7 @@ export function useChat() {
               fullContent += delta;
               setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
             }
-          } catch { /* skip malformed */ }
+          } catch { /* skip */ }
         }
       }
 
