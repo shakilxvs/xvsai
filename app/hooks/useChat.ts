@@ -91,7 +91,7 @@ export function useChat() {
         const res = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: content }),
+          body: JSON.stringify({ query: content, messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })) }),
           signal: ctrl.signal,
         });
         if (!res.ok) {
