@@ -1,45 +1,128 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Message, Mode } from '@/app/lib/types';
-
-const MOCK: Record<Mode, string> = {
-  chat: "Hello! I'm **XVSai** — your premium AI assistant.\n\nPhase 2 will connect to real models:\n- **Llama 3.3 70B** via Groq — fastest\n- **Gemini 1.5 Flash** via Google\n- **DeepSeek R1** for deep reasoning\n\nExplore the interface and switch modes in the sidebar.",
-  deep: "**Deep Think** mode — built for complex reasoning.\n\nPrimary model: **DeepSeek R1**\n\nBest for:\n- Step-by-step analysis\n- Math and logic problems\n- Detailed explanations\n\nFallback: **Gemini 1.5 Pro**",
-  fast: "**Fast mode** — powered by Llama 3.3 70B via Groq.\n\nExpect responses in under 0.5 seconds. Perfect for quick questions.",
-  research: "**Research mode** will search the web before answering.\n\nWhen connected:\n1. Searches via **Tavily API**\n2. Finds current sources\n3. Shows clickable references below the answer",
-  code: "Here's a quick example:\n\n```typescript\nfunction greet(name: string): string {\n  return `Hello, ${name}! Welcome to XVSai.`;\n}\n\nconsole.log(greet('World'));\n```\n\nCode mode uses **Mixtral 8x7B** via Groq.",
-  image: "**Image mode** — generate art from a text description.\n\nWhen connected:\n- Type any description\n- **Pollinations.ai** generates it for free\n- Image appears inline with a download button",
-};
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRoutedTo, setAutoRoutedTo] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(async (
-    content: string, mode: Mode, autoRoute: boolean, detectMode: (t: string) => Mode
+    content: string,
+    mode: Mode,
+    autoRoute: boolean,
+    detectMode: (t: string) => Mode
   ) => {
-    let active = mode;
+    let activeMode = mode;
     let notice: string | null = null;
     if (autoRoute) {
-      const d = detectMode(content);
-      if (d !== mode) {
-        active = d;
-        const lbl = d === 'deep' ? 'Deep Think' : d.charAt(0).toUpperCase() + d.slice(1);
-        notice = `Auto-routed to ${lbl}`;
+      const detected = detectMode(content);
+      if (detected !== mode) {
+        activeMode = detected;
+        const label = detected === 'deep' ? 'Deep Think' : detected.charAt(0).toUpperCase() + detected.slice(1);
+        notice = `Auto-routed to ${label}`;
       }
     }
     setAutoRoutedTo(notice);
-    setMessages(p => [...p, { id: `u-${Date.now()}`, role: 'user', content, mode: active, timestamp: new Date() }]);
+
+    const userMsg: Message = {
+      id: `u-${Date.now()}`,
+      role: 'user',
+      content,
+      mode: activeMode,
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1400));
-    setMessages(p => [...p, {
-      id: `a-${Date.now()}`, role: 'assistant', content: MOCK[active],
-      mode: active, model: 'XVSai Preview', provider: 'Phase 1', timestamp: new Date(),
+
+    const apiMessages = [...messages, userMsg].map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const aiId = `a-${Date.now()}`;
+    setMessages(prev => [...prev, {
+      id: aiId, role: 'assistant', content: '',
+      mode: activeMode, model: '...', provider: '...', timestamp: new Date(),
     }]);
-    setIsLoading(false);
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages, mode: activeMode }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMessages(prev => prev.map(m =>
+          m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong. Please try again.', model: 'Error', provider: '' } : m
+        ));
+        setIsLoading(false);
+        return;
+      }
+
+      const model = res.headers.get('X-Model') ?? 'AI';
+      const provider = res.headers.get('X-Provider') ?? '';
+      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider } : m));
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const raw = trimmed.slice(5).trim();
+          if (raw === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(raw);
+            const delta = parsed.choices?.[0]?.delta?.content ?? '';
+            if (delta) {
+              fullContent += delta;
+              setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
+            }
+          } catch { /* skip malformed */ }
+        }
+      }
+
+      if (!fullContent.trim()) {
+        setMessages(prev => prev.map(m =>
+          m.id === aiId ? { ...m, content: 'No response received. Please try again.', model: 'Error', provider: '' } : m
+        ));
+      }
+
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      setMessages(prev => prev.map(m =>
+        m.id === aiId ? { ...m, content: 'Connection error. Please try again.', model: 'Error', provider: '' } : m
+      ));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages]);
+
+  const clearMessages = useCallback(() => {
+    abortRef.current?.abort();
+    setMessages([]);
+    setAutoRoutedTo(null);
   }, []);
 
-  const clearMessages = useCallback(() => { setMessages([]); setAutoRoutedTo(null); }, []);
   return { messages, isLoading, autoRoutedTo, sendMessage, clearMessages };
 }
