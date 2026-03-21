@@ -12,7 +12,7 @@ import InputBar from '@/app/components/InputBar';
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const { mode, setMode, autoRoute, setAutoRoute, currentMode, detectMode } = useMode();
+  const { mode, setMode, autoRoute, setAutoRoute, currentMode, detectModeAI } = useMode();
   const { messages, isLoading, autoRoutedTo, sendMessage, clearMessages, setMessages } = useChat();
   const { user, loading: authLoading, signInWithGoogle, logout } = useAuth();
   const {
@@ -20,29 +20,22 @@ export default function Home() {
     createConversation, saveMessages, deleteConversation,
   } = useConversations(user);
 
-  // Use a ref to track the active conversation ID synchronously
   const activeIdRef = useRef<string | null>(null);
 
-  // Keep ref in sync with state
   useEffect(() => {
     activeIdRef.current = activeId;
   }, [activeId]);
 
   const handleSend = useCallback(async (text: string) => {
-    // If signed in and no active conversation, create one first
     if (user && !activeIdRef.current) {
       const newId = await createConversation(text, mode);
-      if (newId) {
-        activeIdRef.current = newId; // sync ref immediately
-      }
+      if (newId) activeIdRef.current = newId;
     }
-    await sendMessage(text, mode, autoRoute, detectMode);
-  }, [mode, autoRoute, detectMode, sendMessage, user, createConversation]);
+    await sendMessage(text, mode, autoRoute, detectModeAI);
+  }, [mode, autoRoute, detectModeAI, sendMessage, user, createConversation]);
 
-  // Save messages to Firestore after every AI response completes
   useEffect(() => {
     if (!user || !activeIdRef.current || messages.length === 0 || isLoading) return;
-    // Only save when there's a complete AI message (not still generating)
     const lastMsg = messages[messages.length - 1];
     if (lastMsg.role !== 'assistant' || lastMsg.model === '...') return;
     saveMessages(activeIdRef.current, messages, mode);
@@ -70,14 +63,12 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#05050a' }}>
-      {/* Ambient glow */}
       <div className="fixed pointer-events-none z-0 transition-all duration-[900ms]"
         style={{
           top: 0, left: 0, right: 0, height: '60vh',
           background: `radial-gradient(ellipse 65% 55% at 50% -5%, ${currentMode.glow} 0%, transparent 100%)`,
         }}
       />
-      {/* Dot grid */}
       <div className="fixed inset-0 pointer-events-none z-0 dot-grid" />
 
       <div className="relative z-10 flex flex-col h-full">
@@ -90,7 +81,6 @@ export default function Home() {
           onSignIn={signInWithGoogle}
           onSignOut={logout}
         />
-
         <div className="flex flex-1 overflow-hidden">
           <Sidebar
             isOpen={sidebarOpen}
@@ -106,7 +96,6 @@ export default function Home() {
             onDeleteConversation={deleteConversation}
             onSignIn={signInWithGoogle}
           />
-
           <main className="flex flex-col flex-1 overflow-hidden">
             <ChatArea
               messages={messages}
