@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'firebase/auth';
+import { useState, useEffect } from 'react';
 import { auth, googleProvider } from '@/app/lib/firebase';
 import {
   onAuthStateChanged,
@@ -24,7 +24,6 @@ export function useAuth() {
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err: any) {
-      // User closed popup — ignore
       if (err?.code !== 'auth/popup-closed-by-user') {
         console.error('Sign in error:', err);
       }
