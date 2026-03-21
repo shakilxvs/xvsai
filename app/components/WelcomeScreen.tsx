@@ -45,8 +45,7 @@ export default function WelcomeScreen({ currentMode, onSuggestion, onModeChange 
         </p>
       </div>
 
-      <div className="mb-6 anim-up-1 flex items-center justify-center gap-1.5 flex-wrap w-full max-w-[520px] px-2"
-        >
+      <div className="mb-6 anim-up-1 flex items-center justify-center gap-1.5 md:flex-nowrap md:overflow-x-auto flex-wrap w-full max-w-[720px] pb-1 hide-scrollbar">
         {MODES.map(m => {
           const active = currentMode.id === m.id;
           return (
