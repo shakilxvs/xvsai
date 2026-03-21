@@ -23,36 +23,34 @@ export function useChat() {
     autoRoute: boolean,
     detectMode: (t: string) => Promise<Mode>
   ) => {
-    let activeMode = mode;
-    let notice: string | null = null;
-
-    if (autoRoute) {
-      const detected = await detectMode(content);
-      if (detected !== mode) {
-        activeMode = detected;
-        const label = detected === 'deep' ? 'Deep Think' : detected.charAt(0).toUpperCase() + detected.slice(1);
-        notice = `Auto-routed to ${label}`;
-      }
-    }
-
-    setAutoRoutedTo(notice);
-
+    // ── Step 1: Show user message INSTANTLY — no waiting ──
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: 'user',
       content,
-      mode: activeMode,
+      mode,
       timestamp: new Date(),
     };
-
     const currentMessages = messagesRef.current;
+    updateMessages(prev => [...prev, userMsg]);
+    setIsLoading(true);
+    setAutoRoutedTo(null);
+
     const apiMessages = [...currentMessages, userMsg].map(m => ({
       role: m.role,
       content: m.content,
     }));
 
-    updateMessages(prev => [...prev, userMsg]);
-    setIsLoading(true);
+    // ── Step 2: Detect mode in parallel (don't await before showing message) ──
+    let activeMode = mode;
+    if (autoRoute) {
+      const detected = await detectMode(content);
+      if (detected !== mode) {
+        activeMode = detected;
+        const label = detected === 'deep' ? 'Deep Think' : detected.charAt(0).toUpperCase() + detected.slice(1);
+        setAutoRoutedTo(`Auto-routed to ${label}`);
+      }
+    }
 
     const aiId = `a-${Date.now()}`;
 
@@ -78,11 +76,11 @@ export function useChat() {
           updateMessages(prev => prev.map(m =>
             m.id === aiId ? {
               ...m,
-              content: `Here's your image: **"${content}"**`,
+              content: `"${data.prompt || content}"`,
               imageUrl: data.imageUrl,
               imageLoading: false,
               model: data.provider,
-              provider: 'Phase 3',
+              provider: 'Image',
             } : m
           ));
         }
