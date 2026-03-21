@@ -7,6 +7,17 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [autoRoutedTo, setAutoRoutedTo] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Keep a ref to always have the latest messages — fixes stale closure memory issue
+  const messagesRef = useRef<Message[]>([]);
+
+  // Keep ref in sync
+  const updateMessages = (updater: (prev: Message[]) => Message[]) => {
+    setMessages(prev => {
+      const next = updater(prev);
+      messagesRef.current = next;
+      return next;
+    });
+  };
 
   const sendMessage = useCallback(async (
     content: string,
@@ -33,14 +44,22 @@ export function useChat() {
       mode: activeMode,
       timestamp: new Date(),
     };
-    setMessages(prev => [...prev, userMsg]);
+
+    // Use the ref for building history — always has latest messages
+    const currentMessages = messagesRef.current;
+    const apiMessages = [...currentMessages, userMsg].map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    updateMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
 
     const aiId = `a-${Date.now()}`;
 
     // ── IMAGE MODE ────────────────────────────────────────
     if (activeMode === 'image') {
-      setMessages(prev => [...prev, {
+      updateMessages(prev => [...prev, {
         id: aiId, role: 'assistant', content: '',
         mode: activeMode, model: 'Pollinations.ai', provider: 'Free',
         imageLoading: true, timestamp: new Date(),
@@ -53,11 +72,11 @@ export function useChat() {
         });
         const data = await res.json();
         if (data.error) {
-          setMessages(prev => prev.map(m =>
+          updateMessages(prev => prev.map(m =>
             m.id === aiId ? { ...m, content: data.error, imageLoading: false } : m
           ));
         } else {
-          setMessages(prev => prev.map(m =>
+          updateMessages(prev => prev.map(m =>
             m.id === aiId ? {
               ...m,
               content: `Here's your image: **"${content}"**`,
@@ -69,7 +88,7 @@ export function useChat() {
           ));
         }
       } catch {
-        setMessages(prev => prev.map(m =>
+        updateMessages(prev => prev.map(m =>
           m.id === aiId ? { ...m, content: 'Image generation failed. Please try again.', imageLoading: false } : m
         ));
       }
@@ -79,7 +98,7 @@ export function useChat() {
 
     // ── RESEARCH MODE ─────────────────────────────────────
     if (activeMode === 'research') {
-      setMessages(prev => [...prev, {
+      updateMessages(prev => [...prev, {
         id: aiId, role: 'assistant', content: '',
         mode: activeMode, model: '...', provider: 'Searching...',
         timestamp: new Date(),
@@ -91,12 +110,12 @@ export function useChat() {
         const res = await fetch('/api/research', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: content, messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content })) }),
+          body: JSON.stringify({ query: content, messages: apiMessages }),
           signal: ctrl.signal,
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          setMessages(prev => prev.map(m =>
+          updateMessages(prev => prev.map(m =>
             m.id === aiId ? { ...m, content: data.error ?? 'Research failed.', model: 'Error', provider: '' } : m
           ));
           setIsLoading(false);
@@ -106,7 +125,7 @@ export function useChat() {
         const provider = res.headers.get('X-Provider') ?? 'Research';
         let sources: Source[] = [];
         try { sources = JSON.parse(decodeURIComponent(res.headers.get('X-Sources') ?? '[]')); } catch {}
-        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider, sources } : m));
+        updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider, sources } : m));
         const reader = res.body!.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
@@ -125,21 +144,23 @@ export function useChat() {
             try {
               const parsed = JSON.parse(raw);
               const delta = parsed.choices?.[0]?.delta?.content ?? '';
-              if (delta) { fullContent += delta; setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m)); }
+              if (delta) {
+                fullContent += delta;
+                updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
+              }
             } catch {}
           }
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') return;
-        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Research failed.', model: 'Error', provider: '' } : m));
+        updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Research failed.', model: 'Error', provider: '' } : m));
       }
       setIsLoading(false);
       return;
     }
 
     // ── CHAT / FAST / DEEP / CODE ─────────────────────────
-    const apiMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
-    setMessages(prev => [...prev, {
+    updateMessages(prev => [...prev, {
       id: aiId, role: 'assistant', content: '',
       mode: activeMode, model: '...', provider: '...', timestamp: new Date(),
     }]);
@@ -155,13 +176,13 @@ export function useChat() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong.', model: 'Error', provider: '' } : m));
+        updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: data.error ?? 'Something went wrong.', model: 'Error', provider: '' } : m));
         setIsLoading(false);
         return;
       }
       const model = res.headers.get('X-Model') ?? 'AI';
       const provider = res.headers.get('X-Provider') ?? '';
-      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider } : m));
+      updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, model, provider } : m));
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let fullContent = '';
@@ -180,26 +201,35 @@ export function useChat() {
           try {
             const parsed = JSON.parse(raw);
             const delta = parsed.choices?.[0]?.delta?.content ?? '';
-            if (delta) { fullContent += delta; setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m)); }
+            if (delta) {
+              fullContent += delta;
+              updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
+            }
           } catch {}
         }
       }
       if (!fullContent.trim()) {
-        setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'No response received.', model: 'Error', provider: '' } : m));
+        updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'No response received.', model: 'Error', provider: '' } : m));
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      setMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Connection error. Please try again.', model: 'Error', provider: '' } : m));
+      updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Connection error. Please try again.', model: 'Error', provider: '' } : m));
     } finally {
       setIsLoading(false);
     }
-  }, [messages]);
+  }, []); // No dependencies needed — uses ref for messages
 
   const clearMessages = useCallback(() => {
     abortRef.current?.abort();
+    messagesRef.current = [];
     setMessages([]);
     setAutoRoutedTo(null);
   }, []);
 
-  return { messages, isLoading, autoRoutedTo, sendMessage, clearMessages, setMessages };
+  const setMessagesExternal = useCallback((msgs: Message[]) => {
+    messagesRef.current = msgs;
+    setMessages(msgs);
+  }, []);
+
+  return { messages, isLoading, autoRoutedTo, sendMessage, clearMessages, setMessages: setMessagesExternal };
 }
