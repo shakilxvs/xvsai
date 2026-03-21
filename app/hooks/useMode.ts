@@ -1,14 +1,32 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Mode } from '@/app/lib/types';
 import { MODES } from '@/app/lib/models';
 
 export function useMode() {
   const [mode, setMode] = useState<Mode>('chat');
-  const [autoRoute, setAutoRoute] = useState(false);
+  // Default auto-route to TRUE, persist in localStorage
+  const [autoRoute, setAutoRouteState] = useState(true);
+
+  // Load saved preference on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('xvsai-autoroute');
+    if (saved !== null) {
+      setAutoRouteState(saved === 'true');
+    }
+  }, []);
+
+  // Save preference whenever it changes
+  const setAutoRoute = (val: boolean | ((prev: boolean) => boolean)) => {
+    setAutoRouteState(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      localStorage.setItem('xvsai-autoroute', String(next));
+      return next;
+    });
+  };
+
   const currentMode = MODES.find(m => m.id === mode)!;
 
-  // Fallback keyword detection (used if AI routing fails)
   const detectModeByKeyword = (text: string): Mode => {
     const lower = text.toLowerCase().trim();
     if (/image|draw|generate|picture|photo|illustration|artwork|painting|render|visualize/i.test(lower)) return 'image';
@@ -19,7 +37,6 @@ export function useMode() {
     return 'chat';
   };
 
-  // AI-powered routing — asks Groq to classify the intent
   const detectModeAI = useCallback(async (text: string): Promise<Mode> => {
     try {
       const res = await fetch('/api/route', {
@@ -30,11 +47,9 @@ export function useMode() {
       if (!res.ok) throw new Error('routing failed');
       const data = await res.json();
       const detected = data.mode as Mode;
-      // Validate it's a real mode
       if (MODES.find(m => m.id === detected)) return detected;
       return detectModeByKeyword(text);
     } catch {
-      // If AI routing fails, fall back to keywords silently
       return detectModeByKeyword(text);
     }
   }, []);
