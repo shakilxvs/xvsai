@@ -9,7 +9,7 @@ interface Props {
   sidebarOpen: boolean;
   onToggle: () => void;
   onBack?: () => void;
-  hasMessages: boolean;
+  hasMessages?: boolean;
   user: User | null;
   authLoading: boolean;
   onSignIn: () => void;
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function Header({
-  currentMode, sidebarOpen, onToggle, onBack, hasMessages,
+  currentMode, sidebarOpen, onToggle, onBack, hasMessages = false,
   user, authLoading, onSignIn, onSignOut,
 }: Props) {
   return (
@@ -31,9 +31,7 @@ export default function Header({
         backdropFilter: 'blur(20px)',
       }}
     >
-      {/* Desktop: sidebar toggle | Mobile: back button if in chat, else nothing */}
       <div className="w-8 flex items-center">
-        {/* Desktop sidebar toggle */}
         <button
           onClick={onToggle}
           className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06]"
@@ -42,8 +40,7 @@ export default function Header({
           <PanelLeft size={16} />
         </button>
 
-        {/* Mobile back button — only when in a chat */}
-        {hasMessages && (
+        {hasMessages && onBack && (
           <button
             onClick={onBack}
             className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors active:bg-white/[0.06]"
@@ -54,7 +51,6 @@ export default function Header({
         )}
       </div>
 
-      {/* Logo */}
       <div className="flex items-center gap-2">
         <div
           className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-white transition-all duration-500"
@@ -68,7 +64,6 @@ export default function Header({
         </span>
       </div>
 
-      {/* Mode badge — centered */}
       <div className="flex-1 flex justify-center">
         <div
           className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-500"
@@ -82,7 +77,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* Right */}
       <div className="flex items-center gap-2 md:gap-3">
         <div className="hidden md:flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
