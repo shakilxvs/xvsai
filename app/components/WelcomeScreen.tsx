@@ -46,17 +46,16 @@ export default function WelcomeScreen({ currentMode, onSuggestion, onModeChange 
         </p>
       </div>
 
-      {/* Mode pills — horizontal scroll on mobile */}
-      <div className="w-full mb-6 anim-up-1">
-        <div className="flex gap-2 overflow-x-auto pb-1 px-0 hide-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      {/* Mode pills — centered on desktop, scrollable on mobile */}
+      <div className="w-full max-w-[500px] mb-6 anim-up-1">
+        <div className="flex flex-wrap justify-center gap-2">
           {MODES.map(m => {
             const active = currentMode.id === m.id;
             return (
               <button
                 key={m.id}
                 onClick={() => onModeChange(m.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150 flex-shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150"
                 style={active
                   ? { background: `${m.accent}20`, color: m.accent, border: `1px solid ${m.accent}35` }
                   : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.08)' }
@@ -70,7 +69,7 @@ export default function WelcomeScreen({ currentMode, onSuggestion, onModeChange 
         </div>
       </div>
 
-      {/* Suggestion cards — 1 col mobile, 2 col desktop */}
+      {/* Suggestion cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-[500px] anim-up-2">
         {PROMPTS.map((p, i) => {
           const m = MODES.find(mo => mo.id === p.mode)!;
