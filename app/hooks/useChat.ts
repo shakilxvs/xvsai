@@ -107,6 +107,44 @@ export function useChat() {
       return;
     }
 
+    // ── OPEN MODE — rich media response ──────────────────
+    if (activeMode === 'open') {
+      updateMessages(prev => [...prev, {
+        id: aiId, role: 'assistant', content: '',
+        mode: activeMode, model: '...', provider: 'open-loading',
+        timestamp: new Date(),
+      }]);
+      try {
+        const res = await fetch('/api/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: apiMessages, query: content }),
+        });
+        const data = await res.json();
+        if (data.error) {
+          updateMessages(prev => prev.map(m =>
+            m.id === aiId ? { ...m, content: data.error, model: 'Error', provider: '' } : m
+          ));
+        } else {
+          updateMessages(prev => prev.map(m =>
+            m.id === aiId ? {
+              ...m,
+              content: data.text,
+              openMedia: data.media?.length > 0 ? data.media : undefined,
+              model: 'Open AI',
+              provider: 'open',
+            } : m
+          ));
+        }
+      } catch {
+        updateMessages(prev => prev.map(m =>
+          m.id === aiId ? { ...m, content: 'Something went wrong. Please try again.', model: 'Error', provider: '' } : m
+        ));
+      }
+      setIsLoading(false);
+      return;
+    }
+
     // ── RESEARCH MODE ─────────────────────────────────────
     if (activeMode === 'research') {
       updateMessages(prev => [...prev, {
