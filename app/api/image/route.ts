@@ -6,11 +6,10 @@ export async function POST(req: NextRequest) {
     if (!prompt) return NextResponse.json({ error: 'No prompt provided' }, { status: 400 });
 
     const groqKey     = process.env.GROQ_API_KEY;
-    const hfKey       = process.env.HUGGINGFACE_API_KEY;
     const pexelsKey   = process.env.PEXELS_API_KEY;
     const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
 
-    // ── Step 1: AI classifies intent ─────────────────────
+    // ── Step 1: AI classifies real photo vs AI generation ─
     let useRealPhoto = false;
     let cleanPrompt = prompt
       .replace(/^(generate|make|create|draw|render|produce)\s+(a|an|the|me)?\s*/i, '')
@@ -24,14 +23,10 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
             messages: [
-              {
-                role: 'system',
-                content: 'Classify the image request. Reply JSON only: {"type":"real" or "ai","query":"clean short description"}. "real"=user wants existing photo. "ai"=user wants generated/drawn image.'
-              },
+              { role: 'system', content: 'Classify: {"type":"real" or "ai","query":"clean description"}. real=existing photo wanted. ai=generate/draw/create wanted.' },
               { role: 'user', content: prompt },
             ],
-            max_tokens: 60,
-            temperature: 0,
+            max_tokens: 60, temperature: 0,
           }),
         });
         if (r.ok) {
@@ -40,7 +35,7 @@ export async function POST(req: NextRequest) {
           useRealPhoto = parsed.type === 'real';
           if (parsed.query) cleanPrompt = parsed.query;
         }
-      } catch { /* use cleaned prompt */ }
+      } catch {}
     }
 
     // ── Step 2a: Real photo → Pexels → Unsplash ──────────
@@ -80,63 +75,20 @@ export async function POST(req: NextRequest) {
           }
         } catch {}
       }
-
-      // Real photo not found — fall through to AI generation
     }
 
-    // ── Step 2b: AI generation → HuggingFace FLUX only ───
-    if (!hfKey) {
-      return NextResponse.json({ error: 'Image generation unavailable. Please add HUGGINGFACE_API_KEY.' }, { status: 503 });
-    }
-
-    // Try FLUX.1-schnell first (fastest)
-    const hfModels = [
-      'black-forest-labs/FLUX.1-schnell',
-      'black-forest-labs/FLUX.1-dev',
-      'stabilityai/stable-diffusion-xl-base-1.0',
-    ];
-
-    for (const model of hfModels) {
-      try {
-        const r = await fetch(
-          `https://api-inference.huggingface.co/models/${model}`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${hfKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              inputs: cleanPrompt,
-              parameters: { num_inference_steps: 4, guidance_scale: 0 },
-            }),
-          }
-        );
-
-        if (r.ok) {
-          const contentType = r.headers.get('content-type') ?? 'image/jpeg';
-          if (contentType.includes('image')) {
-            const buffer = await r.arrayBuffer();
-            const base64 = Buffer.from(buffer).toString('base64');
-            const mime = contentType.split(';')[0];
-            return NextResponse.json({
-              imageUrl: `data:${mime};base64,${base64}`,
-              provider: 'FLUX AI',
-              prompt: cleanPrompt,
-              type: 'ai',
-            });
-          }
-        }
-
-        // If model is loading (503), try next
-        if (r.status === 503) continue;
-
-      } catch { continue; }
-    }
+    // ── Step 2b: AI generation → Pollinations FLUX ───────
+    // Pollinations is URL-based — browser loads it directly, no server timeout
+    const encoded = encodeURIComponent(cleanPrompt);
+    const seed = Math.floor(Math.random() * 999999);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux&width=1024&height=1024&nologo=true&seed=${seed}`;
 
     return NextResponse.json({
-      error: 'Image generation is warming up. Please try again in 30 seconds.',
-    }, { status: 503 });
+      imageUrl,
+      provider: 'FLUX AI',
+      prompt: cleanPrompt,
+      type: 'ai',
+    });
 
   } catch {
     return NextResponse.json({ error: 'Image generation failed. Please try again.' }, { status: 500 });
