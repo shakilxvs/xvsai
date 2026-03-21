@@ -89,6 +89,8 @@ export function useConversations(user: User | null) {
       model: m.model ?? null,
       provider: m.provider ?? null,
       imageUrl: m.imageUrl ?? null,
+      images: m.images ?? null,
+openMedia: m.openMedia ?? null,
       sources: m.sources ?? [],
       timestamp: m.timestamp,
     }));
