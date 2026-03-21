@@ -40,7 +40,6 @@ export function useChat() {
       content: m.content,
     }));
 
-    // Auto-route detection (after showing message)
     let activeMode = mode;
     if (autoRoute) {
       const detected = await detectMode(content);
@@ -57,7 +56,7 @@ export function useChat() {
     if (activeMode === 'image') {
       updateMessages(prev => [...prev, {
         id: aiId, role: 'assistant', content: '',
-        mode: activeMode, model: '...', provider: '...',
+        mode: activeMode, model: '...', provider: 'searching',
         imageLoading: true, timestamp: new Date(),
       }]);
       try {
@@ -67,12 +66,12 @@ export function useChat() {
           body: JSON.stringify({ prompt: content }),
         });
         const data = await res.json();
+
         if (data.error) {
           updateMessages(prev => prev.map(m =>
             m.id === aiId ? { ...m, content: data.error, imageLoading: false, model: 'Error', provider: '' } : m
           ));
         } else if (data.type === 'gallery') {
-          // Multiple real photos — Pinterest grid
           updateMessages(prev => prev.map(m =>
             m.id === aiId ? {
               ...m,
@@ -80,11 +79,14 @@ export function useChat() {
               images: data.images,
               imageLoading: false,
               model: 'Photo Search',
-              provider: 'Pexels + Unsplash',
+              provider: 'Multi-source',
             } : m
           ));
         } else {
-          // Single AI generated image
+          // Switch to generating text before result
+          updateMessages(prev => prev.map(m =>
+            m.id === aiId ? { ...m, provider: 'generating' } : m
+          ));
           updateMessages(prev => prev.map(m =>
             m.id === aiId ? {
               ...m,
@@ -153,10 +155,7 @@ export function useChat() {
             try {
               const parsed = JSON.parse(raw);
               const delta = parsed.choices?.[0]?.delta?.content ?? '';
-              if (delta) {
-                fullContent += delta;
-                updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
-              }
+              if (delta) { fullContent += delta; updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m)); }
             } catch {}
           }
         }
@@ -168,7 +167,7 @@ export function useChat() {
       return;
     }
 
-    // ── CHAT / FAST / DEEP / CODE / OPEN ──────────────────
+    // ── ALL OTHER MODES ───────────────────────────────────
     updateMessages(prev => [...prev, {
       id: aiId, role: 'assistant', content: '',
       mode: activeMode, model: '...', provider: '...', timestamp: new Date(),
@@ -210,10 +209,7 @@ export function useChat() {
           try {
             const parsed = JSON.parse(raw);
             const delta = parsed.choices?.[0]?.delta?.content ?? '';
-            if (delta) {
-              fullContent += delta;
-              updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m));
-            }
+            if (delta) { fullContent += delta; updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: fullContent } : m)); }
           } catch {}
         }
       }
@@ -222,7 +218,7 @@ export function useChat() {
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Connection error. Please try again.', model: 'Error', provider: '' } : m));
+      updateMessages(prev => prev.map(m => m.id === aiId ? { ...m, content: 'Connection error.', model: 'Error', provider: '' } : m));
     } finally {
       setIsLoading(false);
     }
