@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { marked } from 'marked';
 import { Copy, Check, Download, ExternalLink, Loader2, ImageOff, X } from 'lucide-react';
-import { Message, ImageResult } from '@/app/lib/types';
+import { Message, ImageResult, MediaItem } from '@/app/lib/types';
 import { MODES } from '@/app/lib/models';
 
 marked.setOptions({ breaks: true, gfm: true });
@@ -218,6 +218,119 @@ function SingleImage({ imageUrl, prompt, accent }: { imageUrl: string; prompt: s
   );
 }
 
+
+// ── Open Mode Rich Media Grid ─────────────────────────────
+function OpenMediaGrid({ media, accent }: { media: MediaItem[]; accent: string }) {
+  const [lightbox, setLightbox] = useState<MediaItem | null>(null);
+  const [errored, setErrored] = useState<Set<string>>(new Set());
+
+  const images = media.filter(m => (m.type === 'image' || m.type === 'gif') && !errored.has(m.url));
+  const videos = media.filter(m => m.type === 'video');
+
+  if (images.length === 0 && videos.length === 0) return null;
+
+  return (
+    <div className="mt-3">
+      {/* Videos */}
+      {videos.length > 0 && (
+        <div className="mb-3 space-y-2">
+          {videos.map((v, i) => (
+            <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+              {v.url.includes('youtube') ? (
+                <iframe
+                  src={v.url}
+                  title={v.title ?? 'video'}
+                  className="w-full"
+                  style={{ height: '200px', border: 'none' }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <video src={v.url} controls className="w-full" style={{ maxHeight: '200px' }} />
+              )}
+              {v.title && (
+                <div className="px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <p className="text-[11px] truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>{v.title}</p>
+                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.25)' }}>{v.provider}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Images & GIFs grid */}
+      {images.length > 0 && (
+        <div style={{ columns: images.length === 1 ? 1 : 2, columnGap: '6px' }}>
+          {images.map((img, i) => (
+            <div key={i}
+              className="group relative cursor-pointer overflow-hidden rounded-xl mb-1.5 break-inside-avoid"
+              onClick={() => setLightbox(img)}>
+              <img
+                src={img.url}
+                alt={img.title ?? 'media'}
+                className="w-full h-auto block transition-transform duration-300 group-hover:scale-[1.03]"
+                style={{ borderRadius: '10px', maxHeight: img.type === 'gif' ? '180px' : '240px', objectFit: 'cover' }}
+                onError={() => setErrored(prev => new Set([...prev, img.url]))}
+              />
+              {img.type === 'gif' && (
+                <span className="absolute top-2 left-2 text-[9px] px-1.5 py-0.5 rounded font-bold text-white"
+                  style={{ background: '#9c00ff' }}>GIF</span>
+              )}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 rounded-xl"
+                style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)' }}>
+                <div className="flex items-end justify-between">
+                  {img.photographer && <p className="text-[10px] text-white/70 truncate">{img.photographer}</p>}
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full text-white ml-auto flex-shrink-0"
+                    style={{ background: accent + '99' }}>{img.provider}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.93)' }}
+          onClick={() => setLightbox(null)}>
+          <div className="max-w-3xl w-full" onClick={e => e.stopPropagation()}>
+            <img src={lightbox.url} alt={lightbox.title ?? ''} className="w-full h-auto rounded-2xl"
+              style={{ maxHeight: '75vh', objectFit: 'contain' }} />
+            <div className="flex items-center justify-between mt-3 px-1">
+              <div>
+                {lightbox.photographer && (
+                  <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {lightbox.photographer} · {lightbox.provider}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <a href={lightbox.url} download target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-white"
+                  style={{ background: accent }}>
+                  <Download size={12} /> Save
+                </a>
+                {lightbox.sourceUrl && (
+                  <a href={lightbox.sourceUrl} target="_blank" rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg text-[11px] text-white"
+                    style={{ background: 'rgba(255,255,255,0.1)' }}>
+                    Source
+                  </a>
+                )}
+                <button onClick={() => setLightbox(null)}
+                  className="px-3 py-1.5 rounded-lg text-[11px] text-white"
+                  style={{ background: 'rgba(255,255,255,0.1)' }}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MessageBubble({ message }: { message: Message }) {
   const [copied, setCopied] = useState(false);
   const mode = MODES.find(m => m.id === message.mode)!;
@@ -288,6 +401,11 @@ export default function MessageBubble({ message }: { message: Message }) {
               style={{ '--accent': mode.accent } as React.CSSProperties}
               dangerouslySetInnerHTML={{ __html: htmlContent }} />
           </div>
+        )}
+
+        {/* Open Mode Rich Media */}
+        {message.openMedia && message.openMedia.length > 0 && (
+          <OpenMediaGrid media={message.openMedia} accent={mode.accent} />
         )}
 
         {/* Research sources */}
