@@ -78,6 +78,7 @@ export function useChat() {
               ...m,
               content: `"${data.prompt || content}"`,
               imageUrl: data.imageUrl,
+              ...(data.photographer && { photographer: data.photographer, photoUrl: data.photoUrl }),
               imageLoading: false,
               model: data.provider,
               provider: 'Image',
