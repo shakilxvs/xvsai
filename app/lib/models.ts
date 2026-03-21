@@ -49,4 +49,12 @@ export const MODES: ModeConfig[] = [
     glow: 'rgba(251,146,60,0.15)',
     gradient: 'linear-gradient(135deg, #f97316, #ef4444)',
   },
+  {
+    id: 'open',
+    label: 'Open',
+    description: 'No restrictions',
+    accent: '#f43f5e',
+    glow: 'rgba(244,63,94,0.15)',
+    gradient: 'linear-gradient(135deg, #f43f5e, #e11d48)',
+  },
 ];
