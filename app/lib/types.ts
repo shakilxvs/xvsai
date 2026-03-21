@@ -5,6 +5,15 @@ export interface Source {
   url: string;
 }
 
+export interface ImageResult {
+  url: string;
+  provider: string;
+  photographer?: string;
+  photoUrl?: string;
+  width?: number;
+  height?: number;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -15,6 +24,7 @@ export interface Message {
   timestamp: Date;
   imageUrl?: string;
   imageLoading?: boolean;
+  images?: ImageResult[];
   sources?: Source[];
 }
 
