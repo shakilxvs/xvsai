@@ -27,9 +27,15 @@ const CHAINS: Record<Mode, Array<{ model: string; provider: string; type: 'openr
     { model: 'gemini-1.5-flash',                   provider: 'Google',  type: 'gemini'     },
   ],
   deep: [
-    { model: 'anthropic/claude-3.5-sonnet',        provider: 'Claude',  type: 'openrouter' },
-    { model: 'deepseek-reasoner',                  provider: 'DeepSeek',type: 'deepseek'   },
-    { model: 'gemini-1.5-pro',                     provider: 'Google',  type: 'gemini'     },
+    { model: 'anthropic/claude-3.5-sonnet',              provider: 'Claude Sonnet',  type: 'openrouter' },
+    { model: 'anthropic/claude-3.5-haiku',               provider: 'Claude Haiku',   type: 'openrouter' },
+    { model: 'google/gemini-2.0-flash-thinking-exp:free', provider: 'Gemini Thinking', type: 'openrouter' },
+    { model: 'deepseek/deepseek-r1:free',                provider: 'DeepSeek R1',    type: 'openrouter' },
+    { model: 'meta-llama/llama-3.3-70b-instruct:free',   provider: 'Llama 3.3',      type: 'openrouter' },
+    { model: 'deepseek-reasoner',                        provider: 'DeepSeek',       type: 'deepseek'   },
+    { model: 'llama-3.3-70b-versatile',                  provider: 'Groq',           type: 'groq'       },
+    { model: 'gemini-1.5-pro',                           provider: 'Google',         type: 'gemini'     },
+    { model: 'gemini-1.5-flash',                         provider: 'Google Flash',   type: 'gemini'     },
   ],
   fast: [
     { model: 'anthropic/claude-3-haiku',           provider: 'Claude',  type: 'openrouter' },
