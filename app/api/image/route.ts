@@ -26,30 +26,27 @@ export async function POST(req: NextRequest) {
             messages: [
               {
                 role: 'system',
-                content: `You classify image requests. Reply with JSON only, no explanation.
-{"type":"real","query":"clean search term"} — when user wants to SEE, FIND, or SHOW an existing real-world photo
-{"type":"ai","query":"clean description"} — when user wants to CREATE, GENERATE, DRAW, or MAKE an image
+                content: `Classify image requests. Reply JSON only.
+{"type":"real","query":"search term"} — user wants to SEE/FIND/SHOW existing photos
+{"type":"ai","query":"description"} — user wants to CREATE/GENERATE/DRAW/MAKE an image
 
-Examples:
-"show me a mountain" → {"type":"real","query":"mountain landscape"}
-"show mountain image" → {"type":"real","query":"mountain"}
-"photo of a beach" → {"type":"real","query":"beach"}
-"find me a cat picture" → {"type":"real","query":"cat"}
-"generate a dragon" → {"type":"ai","query":"dragon"}
-"create a futuristic city" → {"type":"ai","query":"futuristic city"}
-"make a pencil image" → {"type":"ai","query":"pencil detailed drawing"}
-"draw a sunset" → {"type":"ai","query":"sunset painting"}`
+"show mountain" → real
+"phone wallpaper" → real
+"boat" → real
+"beach photo" → real
+"generate dragon" → ai
+"create city" → ai
+"draw a cat" → ai
+"make portrait" → ai`
               },
               { role: 'user', content: prompt },
             ],
-            max_tokens: 80,
-            temperature: 0,
+            max_tokens: 80, temperature: 0,
           }),
         });
         if (r.ok) {
           const d = await r.json();
           const raw = d.choices?.[0]?.message?.content?.trim() ?? '';
-          // Extract JSON even if there's extra text
           const match = raw.match(/\{[^}]+\}/);
           if (match) {
             const parsed = JSON.parse(match[0]);
@@ -57,73 +54,99 @@ Examples:
             if (parsed.query) cleanPrompt = parsed.query;
           }
         }
-      } catch { /* use keyword fallback */ }
+      } catch {}
     }
 
-    // Keyword fallback in case AI classification fails
+    // Keyword fallback
     if (!groqKey) {
-      useRealPhoto = /^(show|find|get|search|look up|photo of|picture of|image of|see a|see the)/i.test(prompt.trim());
+      useRealPhoto = /^(show|find|get|search|look|photo|picture|image of|see|wallpaper|background)/i.test(prompt.trim());
     }
 
-    // ── Step 2a: Real photo → Pexels → Unsplash ──────────
+    // ── Step 2a: Real photos — multiple from Pexels + Unsplash ──
     if (useRealPhoto) {
+      const images: Array<{
+        url: string; provider: string;
+        photographer?: string; photoUrl?: string;
+        width?: number; height?: number;
+      }> = [];
+
+      // Random page so results differ each time
+      const randomPage = Math.floor(Math.random() * 10) + 1;
+
+      // Pexels — get 6 images
       if (pexelsKey) {
         try {
           const r = await fetch(
-            `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanPrompt)}&per_page=1&orientation=landscape`,
+            `https://api.pexels.com/v1/search?query=${encodeURIComponent(cleanPrompt)}&per_page=6&page=${randomPage}&orientation=landscape`,
             { headers: { Authorization: pexelsKey } }
           );
           if (r.ok) {
             const d = await r.json();
-            const photo = d.photos?.[0];
-            if (photo) return NextResponse.json({
-              imageUrl: photo.src.large2x || photo.src.large,
-              provider: 'Pexels', prompt: cleanPrompt, type: 'real',
-              photographer: photo.photographer, photoUrl: photo.url,
-            });
+            for (const photo of d.photos ?? []) {
+              images.push({
+                url: photo.src.large2x || photo.src.large,
+                provider: 'Pexels',
+                photographer: photo.photographer,
+                photoUrl: photo.url,
+                width: photo.width,
+                height: photo.height,
+              });
+            }
           }
         } catch {}
       }
 
+      // Unsplash — get 6 images
       if (unsplashKey) {
         try {
           const r = await fetch(
-            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(cleanPrompt)}&per_page=1&orientation=landscape`,
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(cleanPrompt)}&per_page=6&page=${randomPage}&orientation=landscape`,
             { headers: { Authorization: `Client-ID ${unsplashKey}` } }
           );
           if (r.ok) {
             const d = await r.json();
-            const photo = d.results?.[0];
-            if (photo) return NextResponse.json({
-              imageUrl: photo.urls.regular,
-              provider: 'Unsplash', prompt: cleanPrompt, type: 'real',
-              photographer: photo.user.name, photoUrl: photo.links.html,
-            });
+            for (const photo of d.results ?? []) {
+              images.push({
+                url: photo.urls.regular,
+                provider: 'Unsplash',
+                photographer: photo.user.name,
+                photoUrl: photo.links.html,
+                width: photo.width,
+                height: photo.height,
+              });
+            }
           }
         } catch {}
       }
 
-      // Real photo not found — fall through to AI
+      if (images.length > 0) {
+        // Shuffle so Pexels and Unsplash are interleaved
+        for (let i = images.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [images[i], images[j]] = [images[j], images[i]];
+        }
+        return NextResponse.json({
+          type: 'gallery',
+          images: images.slice(0, 10),
+          prompt: cleanPrompt,
+        });
+      }
     }
 
     // ── Step 2b: AI generation → Stability AI ────────────
     if (stabilityKey) {
       try {
+        const form = new FormData();
+        form.append('prompt', cleanPrompt);
+        form.append('output_format', 'jpeg');
+        form.append('aspect_ratio', '1:1');
+
         const r = await fetch(
           'https://api.stability.ai/v2beta/stable-image/generate/core',
           {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${stabilityKey}`,
-              'Accept': 'image/*',
-            },
-            body: (() => {
-              const form = new FormData();
-              form.append('prompt', cleanPrompt);
-              form.append('output_format', 'jpeg');
-              form.append('aspect_ratio', '1:1');
-              return form;
-            })(),
+            headers: { 'Authorization': `Bearer ${stabilityKey}`, 'Accept': 'image/*' },
+            body: form,
           }
         );
 
@@ -131,20 +154,20 @@ Examples:
           const buffer = await r.arrayBuffer();
           const base64 = Buffer.from(buffer).toString('base64');
           return NextResponse.json({
+            type: 'single',
             imageUrl: `data:image/jpeg;base64,${base64}`,
             provider: 'Stability AI',
             prompt: cleanPrompt,
-            type: 'ai',
           });
         }
       } catch {}
     }
 
     return NextResponse.json({
-      error: 'Image generation failed. Please check your Stability AI key in Vercel environment variables.',
+      error: 'Image generation failed. Please try again.',
     }, { status: 503 });
 
   } catch {
-    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+    return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
   }
 }
