@@ -23,7 +23,6 @@ export function useChat() {
     autoRoute: boolean,
     detectMode: (t: string) => Promise<Mode>
   ) => {
-    // ── Step 1: Show user message INSTANTLY — no waiting ──
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: 'user',
@@ -41,7 +40,7 @@ export function useChat() {
       content: m.content,
     }));
 
-    // ── Step 2: Detect mode in parallel (don't await before showing message) ──
+    // Auto-route detection (after showing message)
     let activeMode = mode;
     if (autoRoute) {
       const detected = await detectMode(content);
@@ -58,7 +57,7 @@ export function useChat() {
     if (activeMode === 'image') {
       updateMessages(prev => [...prev, {
         id: aiId, role: 'assistant', content: '',
-        mode: activeMode, model: 'Pollinations.ai', provider: 'Free',
+        mode: activeMode, model: '...', provider: '...',
         imageLoading: true, timestamp: new Date(),
       }]);
       try {
@@ -70,24 +69,36 @@ export function useChat() {
         const data = await res.json();
         if (data.error) {
           updateMessages(prev => prev.map(m =>
-            m.id === aiId ? { ...m, content: data.error, imageLoading: false } : m
+            m.id === aiId ? { ...m, content: data.error, imageLoading: false, model: 'Error', provider: '' } : m
           ));
-        } else {
+        } else if (data.type === 'gallery') {
+          // Multiple real photos — Pinterest grid
           updateMessages(prev => prev.map(m =>
             m.id === aiId ? {
               ...m,
-              content: `"${data.prompt || content}"`,
+              content: data.prompt,
+              images: data.images,
+              imageLoading: false,
+              model: 'Photo Search',
+              provider: 'Pexels + Unsplash',
+            } : m
+          ));
+        } else {
+          // Single AI generated image
+          updateMessages(prev => prev.map(m =>
+            m.id === aiId ? {
+              ...m,
+              content: data.prompt,
               imageUrl: data.imageUrl,
-              ...(data.photographer && { photographer: data.photographer, photoUrl: data.photoUrl }),
               imageLoading: false,
               model: data.provider,
-              provider: 'Image',
+              provider: 'AI Generated',
             } : m
           ));
         }
       } catch {
         updateMessages(prev => prev.map(m =>
-          m.id === aiId ? { ...m, content: 'Image generation failed. Please try again.', imageLoading: false } : m
+          m.id === aiId ? { ...m, content: 'Image search failed. Please try again.', imageLoading: false, model: 'Error', provider: '' } : m
         ));
       }
       setIsLoading(false);
@@ -157,7 +168,7 @@ export function useChat() {
       return;
     }
 
-    // ── CHAT / FAST / DEEP / CODE ─────────────────────────
+    // ── CHAT / FAST / DEEP / CODE / OPEN ──────────────────
     updateMessages(prev => [...prev, {
       id: aiId, role: 'assistant', content: '',
       mode: activeMode, model: '...', provider: '...', timestamp: new Date(),
