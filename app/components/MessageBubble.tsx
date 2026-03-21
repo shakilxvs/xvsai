@@ -65,7 +65,9 @@ export default function MessageBubble({ message }: { message: Message }) {
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', minHeight: '200px' }}
           >
             <Loader2 size={24} className="animate-spin" style={{ color: mode.accent }} />
-            <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>Generating your image…</p>
+            <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              {message.provider === 'Searching...' ? 'Finding image…' : 'Generating image…'}
+            </p>
           </div>
         )}
 
@@ -73,69 +75,67 @@ export default function MessageBubble({ message }: { message: Message }) {
         {message.imageUrl && !message.imageLoading && (
           <div className="rounded-2xl rounded-tl-sm overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
 
-            {/* Loading state while image fetches */}
+            {/* Loading */}
             {!imgLoaded && !imgError && (
-              <div
-                className="flex flex-col items-center justify-center gap-3 p-8"
-                style={{ background: 'rgba(255,255,255,0.03)', minHeight: '260px' }}
-              >
+              <div className="flex flex-col items-center justify-center gap-3 p-8"
+                style={{ background: 'rgba(255,255,255,0.03)', minHeight: '260px' }}>
                 <Loader2 size={24} className="animate-spin" style={{ color: mode.accent }} />
-                <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Loading image…</p>
+                <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Loading…</p>
               </div>
             )}
 
-            {/* Error state */}
+            {/* Error */}
             {imgError && (
-              <div
-                className="flex flex-col items-center justify-center gap-3 p-8"
-                style={{ background: 'rgba(255,255,255,0.03)', minHeight: '200px' }}
-              >
+              <div className="flex flex-col items-center justify-center gap-3 p-8"
+                style={{ background: 'rgba(255,255,255,0.03)', minHeight: '200px' }}>
                 <ImageOff size={24} style={{ color: 'rgba(255,255,255,0.3)' }} />
                 <p className="text-[12px] text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                  Image took too long to load.
+                  Could not load image.
                 </p>
-                <a
-                  href={message.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[12px] underline underline-offset-2"
-                  style={{ color: mode.accent }}
-                >
-                  Open image in new tab →
+                <a href={message.imageUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-[12px] underline underline-offset-2" style={{ color: mode.accent }}>
+                  Open in new tab →
                 </a>
               </div>
             )}
 
-            {/* The actual image */}
+            {/* Image */}
             <img
               src={message.imageUrl}
-              alt="Generated image"
+              alt="Image result"
               style={{
                 display: imgLoaded ? 'block' : 'none',
-                width: '100%',
-                height: 'auto',
-                maxHeight: '512px',
-                objectFit: 'contain',
+                width: '100%', height: 'auto',
+                maxHeight: '512px', objectFit: 'contain',
               }}
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
             />
 
-            {/* Caption + download */}
+            {/* Footer */}
             {(imgLoaded || imgError) && (
-              <div
-                className="flex items-center justify-between px-4 py-3 gap-3"
-                style={{ background: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.07)' }}
-              >
-                <p className="text-[12px] truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  {message.content.replace("Here's your image: ", '').replace(/\*\*/g, '')}
-                </p>
+              <div className="flex items-center justify-between px-4 py-3 gap-3"
+                style={{ background: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="min-w-0">
+                  <p className="text-[12px] truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {message.content}
+                  </p>
+                  {/* Photographer credit for real photos */}
+                  {(message as any).photographer && (
+                    <p className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      Photo by{' '}
+                      <a href={(message as any).photoUrl} target="_blank" rel="noopener noreferrer"
+                        className="underline" style={{ color: mode.accent }}>
+                        {(message as any).photographer}
+                      </a>
+                      {' '}on {message.provider}
+                    </p>
+                  )}
+                </div>
                 {imgLoaded && (
-                  <button
-                    onClick={downloadImage}
+                  <button onClick={downloadImage}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all flex-shrink-0 hover:bg-white/[0.08]"
-                    style={{ color: mode.accent, border: `1px solid ${mode.accent}35` }}
-                  >
+                    style={{ color: mode.accent, border: `1px solid ${mode.accent}35` }}>
                     <Download size={12} strokeWidth={2} /> Save
                   </button>
                 )}
@@ -146,19 +146,14 @@ export default function MessageBubble({ message }: { message: Message }) {
 
         {/* TEXT RESPONSE */}
         {!message.imageUrl && !message.imageLoading && (
-          <div
-            className="relative px-4 py-4 rounded-2xl rounded-tl-sm"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            <button
-              onClick={copyMsg}
+          <div className="relative px-4 py-4 rounded-2xl rounded-tl-sm"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <button onClick={copyMsg}
               className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-white/[0.08]"
-              style={{ color: 'rgba(255,255,255,0.4)' }}
-            >
+              style={{ color: 'rgba(255,255,255,0.4)' }}>
               {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
             </button>
-            <div
-              className="pr-8 prose-xvsai"
+            <div className="pr-8 prose-xvsai"
               style={{ '--accent': mode.accent } as React.CSSProperties}
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
@@ -169,15 +164,11 @@ export default function MessageBubble({ message }: { message: Message }) {
         {message.sources && message.sources.length > 0 && (
           <div style={{ marginTop: '10px' }}>
             <p className="text-[10px] font-semibold uppercase tracking-widest mb-1.5"
-              style={{ color: 'rgba(255,255,255,0.3)' }}>
-              Sources
-            </p>
+              style={{ color: 'rgba(255,255,255,0.3)' }}>Sources</p>
             {message.sources.map((src, i) => (
-              <a
-                key={i} href={src.url} target="_blank" rel="noopener noreferrer"
+              <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all hover:bg-white/[0.05] mb-1.5"
-                style={{ border: '1px solid rgba(255,255,255,0.08)' }}
-              >
+                style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
                 <span className="text-[12px] font-medium truncate flex-1" style={{ color: 'rgba(255,255,255,0.6)' }}>
                   {src.title}
                 </span>
