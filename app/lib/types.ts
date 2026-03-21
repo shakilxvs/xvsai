@@ -8,10 +8,21 @@ export interface Source {
 export interface ImageResult {
   url: string;
   provider: string;
+  providerUrl?: string;
   photographer?: string;
   photoUrl?: string;
   width?: number;
   height?: number;
+}
+
+export interface MediaItem {
+  type: 'image' | 'video' | 'gif';
+  url: string;
+  thumb?: string;
+  title?: string;
+  provider: string;
+  sourceUrl?: string;
+  photographer?: string;
 }
 
 export interface Message {
@@ -26,6 +37,7 @@ export interface Message {
   imageLoading?: boolean;
   images?: ImageResult[];
   sources?: Source[];
+  openMedia?: MediaItem[];
 }
 
 export interface ModeConfig {
