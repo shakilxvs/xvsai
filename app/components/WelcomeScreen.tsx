@@ -5,12 +5,12 @@ import { MODES } from '@/app/lib/models';
 import React from 'react';
 
 const ICONS: Record<Mode, React.ReactNode> = {
-  chat:     <MessageSquare size={13} strokeWidth={1.75} />,
-  deep:     <Brain size={13} strokeWidth={1.75} />,
-  fast:     <Zap size={13} strokeWidth={1.75} />,
-  research: <Search size={13} strokeWidth={1.75} />,
-  code:     <Code2 size={13} strokeWidth={1.75} />,
-  image:    <Image size={13} strokeWidth={1.75} />,
+  chat:     <MessageSquare size={12} strokeWidth={1.75} />,
+  deep:     <Brain size={12} strokeWidth={1.75} />,
+  fast:     <Zap size={12} strokeWidth={1.75} />,
+  research: <Search size={12} strokeWidth={1.75} />,
+  code:     <Code2 size={12} strokeWidth={1.75} />,
+  image:    <Image size={12} strokeWidth={1.75} />,
 };
 
 const PROMPTS: { text: string; mode: Mode }[] = [
@@ -46,27 +46,26 @@ export default function WelcomeScreen({ currentMode, onSuggestion, onModeChange 
         </p>
       </div>
 
-      {/* Mode pills — centered on desktop, scrollable on mobile */}
-      <div className="w-full max-w-[500px] mb-6 anim-up-1">
-        <div className="flex flex-wrap justify-center gap-2">
-          {MODES.map(m => {
-            const active = currentMode.id === m.id;
-            return (
-              <button
-                key={m.id}
-                onClick={() => onModeChange(m.id)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium transition-all duration-150"
-                style={active
-                  ? { background: `${m.accent}20`, color: m.accent, border: `1px solid ${m.accent}35` }
-                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.08)' }
-                }
-              >
-                {ICONS[m.id]}
-                {m.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Mode pills — all in one line, no wrap */}
+      <div className="mb-6 anim-up-1 flex items-center justify-center gap-1.5 flex-nowrap overflow-x-auto w-full max-w-[600px] pb-1"
+        style={{ scrollbarWidth: 'none' }}>
+        {MODES.map(m => {
+          const active = currentMode.id === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => onModeChange(m.id)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11.5px] font-medium transition-all duration-150 flex-shrink-0"
+              style={active
+                ? { background: `${m.accent}20`, color: m.accent, border: `1px solid ${m.accent}35` }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.08)' }
+              }
+            >
+              {ICONS[m.id]}
+              {m.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Suggestion cards */}
