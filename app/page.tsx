@@ -9,9 +9,13 @@ import Header from '@/app/components/Header';
 import Sidebar from '@/app/components/Sidebar';
 import ChatArea from '@/app/components/ChatArea';
 import InputBar from '@/app/components/InputBar';
+import MobileNav from '@/app/components/MobileNav';
+import { HistorySheet, ModePickerSheet } from '@/app/components/MobileSheet';
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSheet, setMobileSheet] = useState<'history' | 'modes' | null>(null);
+
   const { mode, setMode, autoRoute, setAutoRoute, currentMode, detectModeAI } = useMode();
   const { messages, isLoading, autoRoutedTo, sendMessage, clearMessages, setMessages } = useChat();
   const { user, loading: authLoading, signInWithGoogle, logout } = useAuth();
@@ -61,8 +65,24 @@ export default function Home() {
     activeIdRef.current = null;
   };
 
+  // Mobile back = go to welcome screen (clear messages)
+  const handleBack = () => {
+    clearMessages();
+    setActiveId(null);
+    activeIdRef.current = null;
+  };
+
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: '#05050a' }}>
+    <div
+      className="flex flex-col overflow-hidden"
+      style={{
+        background: '#05050a',
+        height: '100dvh', // dvh = dynamic viewport height, handles mobile browser bars
+      }}
+    >
+      {/* Ambient glow */}
       <div className="fixed pointer-events-none z-0 transition-all duration-[900ms]"
         style={{
           top: 0, left: 0, right: 0, height: '60vh',
@@ -76,12 +96,16 @@ export default function Home() {
           currentMode={currentMode}
           sidebarOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(p => !p)}
+          onBack={handleBack}
+          hasMessages={hasMessages}
           user={user}
           authLoading={authLoading}
           onSignIn={signInWithGoogle}
           onSignOut={logout}
         />
+
         <div className="flex flex-1 overflow-hidden">
+          {/* Desktop sidebar */}
           <Sidebar
             isOpen={sidebarOpen}
             currentMode={currentMode}
@@ -96,6 +120,7 @@ export default function Home() {
             onDeleteConversation={deleteConversation}
             onSignIn={signInWithGoogle}
           />
+
           <main className="flex flex-col flex-1 overflow-hidden">
             <ChatArea
               messages={messages}
@@ -112,7 +137,41 @@ export default function Home() {
             />
           </main>
         </div>
+
+        {/* Mobile bottom nav */}
+        <MobileNav
+          currentMode={currentMode}
+          onOpenSidebar={() => setMobileSheet('history')}
+          onNewChat={handleNewChat}
+          onOpenModes={() => setMobileSheet('modes')}
+          hasMessages={hasMessages}
+        />
       </div>
+
+      {/* Mobile sheets */}
+      {mobileSheet === 'history' && (
+        <HistorySheet
+          currentMode={currentMode}
+          conversations={conversations}
+          activeConvId={activeId}
+          user={user}
+          autoRoute={autoRoute}
+          onAutoRouteToggle={() => setAutoRoute(p => !p)}
+          onSelectConversation={handleSelectConversation}
+          onDeleteConversation={deleteConversation}
+          onNewChat={handleNewChat}
+          onSignIn={signInWithGoogle}
+          onClose={() => setMobileSheet(null)}
+        />
+      )}
+
+      {mobileSheet === 'modes' && (
+        <ModePickerSheet
+          currentMode={currentMode}
+          onModeChange={handleModeChange}
+          onClose={() => setMobileSheet(null)}
+        />
+      )}
     </div>
   );
 }
