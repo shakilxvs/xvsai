@@ -28,6 +28,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   'The Dog API': '#f59e0b',
   'The Cat API': '#8b5cf6',
   'RandomFox': '#f97316',
+  'Freepik': '#1273eb',
 };
 
 function ImageGallery({ images, prompt, accent }: {
