@@ -6,6 +6,9 @@ import { Copy, Check, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { Message } from '@/app/lib/types';
 import { MODES } from '@/app/lib/models';
 
+// Wrapper to avoid TypeScript strict component type errors with react-markdown v8
+const Markdown = ReactMarkdown as any;
+
 export default function MessageBubble({ message }: { message: Message }) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState<string | null>(null);
@@ -44,6 +47,74 @@ export default function MessageBubble({ message }: { message: Message }) {
       </div>
     );
   }
+
+  const mdComponents = {
+    p: ({ children }: any) => (
+      <p style={{ marginBottom: '10px', lineHeight: 1.8, color: '#dcdce8' }}>{children}</p>
+    ),
+    strong: ({ children }: any) => (
+      <strong style={{ fontWeight: 600, color: '#ffffff' }}>{children}</strong>
+    ),
+    em: ({ children }: any) => (
+      <em style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.6)' }}>{children}</em>
+    ),
+    ul: ({ children }: any) => (
+      <ul style={{ margin: '10px 0', padding: 0, listStyle: 'none' }}>{children}</ul>
+    ),
+    ol: ({ children }: any) => (
+      <ol style={{ margin: '10px 0', paddingLeft: '20px', color: '#c8c8dc' }}>{children}</ol>
+    ),
+    li: ({ children }: any) => (
+      <li style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px', color: '#c8c8dc' }}>
+        <span style={{ width: 4, height: 4, minWidth: 4, borderRadius: '50%', marginTop: 8, background: mode.accent, flexShrink: 0, display: 'inline-block' }} />
+        <span>{children}</span>
+      </li>
+    ),
+    a: ({ href, children }: any) => (
+      <a href={href} target="_blank" rel="noopener noreferrer"
+        style={{ color: mode.accent, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+        {children}
+      </a>
+    ),
+    code: ({ inline, className, children }: any) => {
+      const isBlock = !inline && className?.includes('language-');
+      const lang = className?.replace('language-', '') || '';
+      const codeStr = String(children).replace(/\n$/, '');
+      const blockId = `b-${codeStr.slice(0, 12)}`;
+      if (isBlock) {
+        return (
+          <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ fontSize: '10px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)' }}>{lang || 'code'}</span>
+              <button onClick={() => copyCode(codeStr, blockId)}
+                style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {codeCopied === blockId ? <><Check size={11} /> copied</> : <><Copy size={11} /> copy</>}
+              </button>
+            </div>
+            <pre style={{ margin: 0, padding: '16px', overflowX: 'auto', background: 'rgba(0,0,0,0.5)' }}>
+              <code style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', lineHeight: 1.7, color: '#d8e0f0' }}>
+                {codeStr}
+              </code>
+            </pre>
+          </div>
+        );
+      }
+      return (
+        <code style={{ fontFamily: 'monospace', fontSize: '12px', padding: '2px 6px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: mode.accent }}>
+          {children}
+        </code>
+      );
+    },
+    h1: ({ children }: any) => <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: '20px 0 10px' }}>{children}</h1>,
+    h2: ({ children }: any) => <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#fff', margin: '16px 0 8px' }}>{children}</h2>,
+    h3: ({ children }: any) => <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#f0f0f8', margin: '12px 0 6px' }}>{children}</h3>,
+    blockquote: ({ children }: any) => (
+      <blockquote style={{ borderLeft: `2px solid ${mode.accent}70`, paddingLeft: '14px', margin: '12px 0', fontStyle: 'italic', color: 'rgba(255,255,255,0.5)' }}>
+        {children}
+      </blockquote>
+    ),
+    hr: () => <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} />,
+  };
 
   return (
     <div className="flex items-start gap-2.5 anim-up group">
@@ -100,81 +171,10 @@ export default function MessageBubble({ message }: { message: Message }) {
               style={{ color: 'rgba(255,255,255,0.4)' }}>
               {copied ? <Check size={13} strokeWidth={2} /> : <Copy size={13} strokeWidth={1.75} />}
             </button>
-
             <div className="pr-8">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  p: ({ children }) => (
-                    <p style={{ marginBottom: '10px', lineHeight: 1.8, color: '#dcdce8' }}>{children}</p>
-                  ),
-                  strong: ({ children }) => (
-                    <strong style={{ fontWeight: 600, color: '#ffffff' }}>{children}</strong>
-                  ),
-                  em: ({ children }) => (
-                    <em style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.6)' }}>{children}</em>
-                  ),
-                  ul: ({ children }) => (
-                    <ul style={{ margin: '10px 0', padding: 0, listStyle: 'none' }}>{children}</ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol style={{ margin: '10px 0', paddingLeft: '20px', color: '#c8c8dc' }}>{children}</ol>
-                  ),
-                  li: ({ children }) => (
-                    <li style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '6px', color: '#c8c8dc' }}>
-                      <span style={{ width: 4, height: 4, minWidth: 4, borderRadius: '50%', marginTop: 8, background: mode.accent, flexShrink: 0, display: 'inline-block' }} />
-                      <span>{children}</span>
-                    </li>
-                  ),
-                  a: ({ href, children }) => (
-                    <a href={href} target="_blank" rel="noopener noreferrer"
-                      style={{ color: mode.accent, textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
-                      {children}
-                    </a>
-                  ),
-                  // @ts-ignore
-                  code: ({ inline, className, children }) => {
-                    const isBlock = !inline && className?.includes('language-');
-                    const lang = className?.replace('language-', '') || '';
-                    const codeStr = String(children).replace(/\n$/, '');
-                    const blockId = `b-${codeStr.slice(0, 12)}`;
-                    if (isBlock) {
-                      return (
-                        <div style={{ margin: '16px 0', borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                            <span style={{ fontSize: '10px', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.3)' }}>{lang || 'code'}</span>
-                            <button onClick={() => copyCode(codeStr, blockId)}
-                              style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              {codeCopied === blockId ? <><Check size={11} /> copied</> : <><Copy size={11} /> copy</>}
-                            </button>
-                          </div>
-                          <pre style={{ margin: 0, padding: '16px', overflowX: 'auto', background: 'rgba(0,0,0,0.5)' }}>
-                            <code style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '12px', lineHeight: 1.7, color: '#d8e0f0' }}>
-                              {codeStr}
-                            </code>
-                          </pre>
-                        </div>
-                      );
-                    }
-                    return (
-                      <code style={{ fontFamily: 'monospace', fontSize: '12px', padding: '2px 6px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', color: mode.accent }}>
-                        {children}
-                      </code>
-                    );
-                  },
-                  h1: ({ children }) => <h1 style={{ fontSize: '18px', fontWeight: 600, color: '#fff', margin: '20px 0 10px' }}>{children}</h1>,
-                  h2: ({ children }) => <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#fff', margin: '16px 0 8px' }}>{children}</h2>,
-                  h3: ({ children }) => <h3 style={{ fontSize: '14px', fontWeight: 600, color: '#f0f0f8', margin: '12px 0 6px' }}>{children}</h3>,
-                  blockquote: ({ children }) => (
-                    <blockquote style={{ borderLeft: `2px solid ${mode.accent}70`, paddingLeft: '14px', margin: '12px 0', fontStyle: 'italic', color: 'rgba(255,255,255,0.5)' }}>
-                      {children}
-                    </blockquote>
-                  ),
-                  hr: () => <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '16px 0' }} />,
-                }}
-              >
+              <Markdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                 {message.content}
-              </ReactMarkdown>
+              </Markdown>
             </div>
           </div>
         )}
@@ -182,7 +182,9 @@ export default function MessageBubble({ message }: { message: Message }) {
         {/* SOURCES */}
         {message.sources && message.sources.length > 0 && (
           <div style={{ marginTop: '10px' }}>
-            <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', marginBottom: '6px' }}>Sources</p>
+            <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', marginBottom: '6px' }}>
+              Sources
+            </p>
             {message.sources.map((src, i) => (
               <a key={i} href={src.url} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all hover:bg-white/[0.05] mb-1.5"
