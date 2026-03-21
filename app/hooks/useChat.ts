@@ -7,10 +7,8 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [autoRoutedTo, setAutoRoutedTo] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // Keep a ref to always have the latest messages — fixes stale closure memory issue
   const messagesRef = useRef<Message[]>([]);
 
-  // Keep ref in sync
   const updateMessages = (updater: (prev: Message[]) => Message[]) => {
     setMessages(prev => {
       const next = updater(prev);
@@ -23,18 +21,20 @@ export function useChat() {
     content: string,
     mode: Mode,
     autoRoute: boolean,
-    detectMode: (t: string) => Mode
+    detectMode: (t: string) => Promise<Mode>
   ) => {
     let activeMode = mode;
     let notice: string | null = null;
+
     if (autoRoute) {
-      const detected = detectMode(content);
+      const detected = await detectMode(content);
       if (detected !== mode) {
         activeMode = detected;
         const label = detected === 'deep' ? 'Deep Think' : detected.charAt(0).toUpperCase() + detected.slice(1);
         notice = `Auto-routed to ${label}`;
       }
     }
+
     setAutoRoutedTo(notice);
 
     const userMsg: Message = {
@@ -45,7 +45,6 @@ export function useChat() {
       timestamp: new Date(),
     };
 
-    // Use the ref for building history — always has latest messages
     const currentMessages = messagesRef.current;
     const apiMessages = [...currentMessages, userMsg].map(m => ({
       role: m.role,
@@ -217,7 +216,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, []); // No dependencies needed — uses ref for messages
+  }, []);
 
   const clearMessages = useCallback(() => {
     abortRef.current?.abort();
