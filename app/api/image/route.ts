@@ -352,7 +352,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Step 2b: AI generation → Stability AI ────────────
+    // ── Step 2b: AI generation → Stability AI → Pollinations fallback ─
     if (stabilityKey) {
       try {
         const form = new FormData();
@@ -372,7 +372,15 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json({ error: 'Image search failed. Please try again.' }, { status: 503 });
+    // ── Fallback: Pollinations FLUX (always free, no key) ─
+    const encoded = encodeURIComponent(cleanPrompt);
+    const seed = Math.floor(Math.random() * 999999);
+    return NextResponse.json({
+      type: 'single',
+      imageUrl: `https://image.pollinations.ai/prompt/${encoded}?model=flux&width=1024&height=1024&nologo=true&seed=${seed}`,
+      provider: 'FLUX AI',
+      prompt: cleanPrompt,
+    });
 
   } catch {
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
