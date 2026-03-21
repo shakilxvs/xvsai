@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
     const giphyKey       = process.env.GIPHY_API_KEY;
     const wallhavenKey   = process.env.WALLHAVEN_API_KEY;
     const imgurClientId  = process.env.IMGUR_CLIENT_ID;
+    const freepikKey     = process.env.FREEPIK_API_KEY;
 
     // ── Step 1: AI classifies intent ─────────────────────
     let useRealPhoto = false;
@@ -185,6 +186,12 @@ export async function POST(req: NextRequest) {
         fetch(
           `https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=${enc}&srnamespace=6&srlimit=4&format=json&origin=*`
         ).then(r => r.ok ? r.json() : null),
+
+        // 21. Freepik — free key at freepik.com/api
+        freepikKey ? fetch(
+          `https://api.freepik.com/v1/resources?term=${enc}&limit=4&page=${page}&filters[content_type][photo]=1&filters[orientation][landscape]=1`,
+          { headers: { 'x-freepik-api-key': freepikKey, 'Accept-Language': 'en-US' } }
+        ).then(r => r.ok ? r.json() : null) : Promise.resolve(null),
       ]);
 
       const get = (i: number) => results[i]?.status === 'fulfilled' ? (results[i] as any).value : null;
@@ -321,6 +328,18 @@ export async function POST(req: NextRequest) {
             }
           }
         } catch {}
+      }
+
+      // 21. Freepik
+      for (const p of get(20)?.data ?? []) {
+        const url = p.image?.source?.url;
+        if (url) images.push({
+          url,
+          provider: 'Freepik',
+          providerUrl: 'https://freepik.com',
+          photographer: p.author?.name,
+          photoUrl: p.url,
+        });
       }
 
       if (images.length > 0) {
