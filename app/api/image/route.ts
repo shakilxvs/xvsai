@@ -5,13 +5,18 @@ export async function POST(req: NextRequest) {
     const { prompt }: { prompt: string } = await req.json();
     if (!prompt) return NextResponse.json({ error: 'No prompt provided' }, { status: 400 });
 
-    const clean = encodeURIComponent(prompt.trim());
-    const seed = Math.floor(Math.random() * 1000000);
+    // Clean the prompt - remove meta words like "generate", "make", "create"
+    const cleanPrompt = prompt
+      .replace(/^(generate|make|create|draw|show|give me|render|produce)\s+(a|an|the|me)?\s*/i, '')
+      .trim();
 
-    // Return URL directly — browser loads the image, no server timeout risk
-    const imageUrl = `https://image.pollinations.ai/prompt/${clean}?width=1024&height=1024&nologo=true&seed=${seed}`;
+    const encoded = encodeURIComponent(cleanPrompt);
+    const seed = Math.floor(Math.random() * 999999);
 
-    return NextResponse.json({ imageUrl, provider: 'Pollinations.ai' });
+    // Use the flux model specifically - more reliable than default sana model
+    const imageUrl = `https://image.pollinations.ai/prompt/${encoded}?model=flux&width=1024&height=1024&nologo=true&seed=${seed}`;
+
+    return NextResponse.json({ imageUrl, provider: 'Pollinations.ai', prompt: cleanPrompt });
 
   } catch {
     return NextResponse.json({ error: 'Failed. Please try again.' }, { status: 500 });
