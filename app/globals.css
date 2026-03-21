@@ -74,3 +74,50 @@ body {
 .prose-xvsai table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12.5px; }
 .prose-xvsai th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(255,255,255,0.1); }
 .prose-xvsai td { padding: 8px 12px; color: #c0c0d8; border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+/* ── Mobile Safe Area & PWA ──────────────────────────────── */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* Prevent rubber-band scroll on iOS */
+html { height: -webkit-fill-available; }
+body { min-height: -webkit-fill-available; }
+
+/* Mobile typography scale */
+@media (max-width: 768px) {
+  .prose-xvsai { font-size: 15px !important; line-height: 1.8 !important; }
+  .prose-xvsai p { margin-bottom: 12px; }
+  .prose-xvsai h1 { font-size: 20px !important; }
+  .prose-xvsai h2 { font-size: 18px !important; }
+  .prose-xvsai h3 { font-size: 16px !important; }
+  .prose-xvsai pre code { font-size: 13px !important; }
+}
+
+/* Mobile bottom sheet */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+.sheet-open  { animation: slideUp 0.28s cubic-bezier(0.32,0.72,0,1) both; }
+.sheet-close { animation: slideDown 0.22s ease-in both; }
+
+/* Bottom nav safe area */
+.mobile-nav-pad {
+  padding-bottom: max(12px, var(--safe-bottom));
+}
+.input-pad {
+  padding-bottom: max(16px, calc(var(--safe-bottom) + 8px));
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
