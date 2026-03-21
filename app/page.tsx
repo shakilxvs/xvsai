@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Mode, Message } from '@/app/lib/types';
 import { useMode } from '@/app/hooks/useMode';
 import { useChat } from '@/app/hooks/useChat';
@@ -20,38 +20,44 @@ export default function Home() {
     createConversation, saveMessages, deleteConversation,
   } = useConversations(user);
 
-  // When user sends a message — create or update conversation
-  const handleSend = useCallback(async (text: string) => {
-    let convId = activeId;
+  // Use a ref to track the active conversation ID synchronously
+  const activeIdRef = useRef<string | null>(null);
 
-    // If no active conversation — create one
-    if (!convId && user) {
-      convId = await createConversation(text, mode);
-    }
-
-    // Send the message (streaming)
-    await sendMessage(text, mode, autoRoute, detectMode);
-  }, [mode, autoRoute, detectMode, sendMessage, activeId, user, createConversation]);
-
-  // Save messages to Firestore whenever they change (debounced)
+  // Keep ref in sync with state
   useEffect(() => {
-    if (!user || !activeId || messages.length === 0 || isLoading) return;
-    const timer = setTimeout(() => {
-      saveMessages(activeId, messages, mode);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [messages, isLoading, user, activeId, mode, saveMessages]);
+    activeIdRef.current = activeId;
+  }, [activeId]);
 
-  // Load a conversation from history
+  const handleSend = useCallback(async (text: string) => {
+    // If signed in and no active conversation, create one first
+    if (user && !activeIdRef.current) {
+      const newId = await createConversation(text, mode);
+      if (newId) {
+        activeIdRef.current = newId; // sync ref immediately
+      }
+    }
+    await sendMessage(text, mode, autoRoute, detectMode);
+  }, [mode, autoRoute, detectMode, sendMessage, user, createConversation]);
+
+  // Save messages to Firestore after every AI response completes
+  useEffect(() => {
+    if (!user || !activeIdRef.current || messages.length === 0 || isLoading) return;
+    // Only save when there's a complete AI message (not still generating)
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg.role !== 'assistant' || lastMsg.model === '...') return;
+    saveMessages(activeIdRef.current, messages, mode);
+  }, [messages, isLoading, user, mode, saveMessages]);
+
   const handleSelectConversation = useCallback((conv: Conversation) => {
     setActiveId(conv.id);
+    activeIdRef.current = conv.id;
     setMode(conv.mode);
     setMessages(conv.messages);
   }, [setActiveId, setMode, setMessages]);
 
-  // New chat
   const handleNewChat = useCallback(() => {
     setActiveId(null);
+    activeIdRef.current = null;
     clearMessages();
   }, [setActiveId, clearMessages]);
 
@@ -59,6 +65,7 @@ export default function Home() {
     setMode(newMode);
     clearMessages();
     setActiveId(null);
+    activeIdRef.current = null;
   };
 
   return (
