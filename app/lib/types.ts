@@ -1,4 +1,4 @@
-export type Mode = 'chat' | 'deep' | 'fast' | 'research' | 'code' | 'image';
+export type Mode = 'chat' | 'deep' | 'fast' | 'research' | 'code' | 'image' | 'open';
 
 export interface Source {
   title: string;
