@@ -1,4 +1,5 @@
 export type Mode = 'chat' | 'deep' | 'fast' | 'research' | 'code' | 'image' | 'open';
+export type UserStatus = 'pending' | 'approved' | 'banned' | 'rejected';
 
 export interface Source {
   title: string;
@@ -47,4 +48,21 @@ export interface ModeConfig {
   accent: string;
   glow: string;
   gradient: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  phone?: string;
+  dob?: string;
+  gender?: string;
+  address?: string;
+  bio?: string;
+  status: UserStatus;
+  rejectionNote?: string;
+  createdAt: Date;
+  lastActive: Date;
+  provider: 'google' | 'email';
 }
