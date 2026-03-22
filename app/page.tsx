@@ -11,14 +11,23 @@ import ChatArea from '@/app/components/ChatArea';
 import InputBar from '@/app/components/InputBar';
 import MobileNav from '@/app/components/MobileNav';
 import { HistorySheet, ModePickerSheet } from '@/app/components/MobileSheet';
+import AuthScreen from '@/app/components/AuthScreen';
+import ApprovalGate from '@/app/components/ApprovalGate';
+import UserProfile from '@/app/components/UserProfile';
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSheet, setMobileSheet] = useState<'history' | 'modes' | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const { mode, setMode, autoRoute, setAutoRoute, currentMode, detectModeAI } = useMode();
   const { messages, isLoading, autoRoutedTo, sendMessage, clearMessages, setMessages } = useChat();
-  const { user, loading: authLoading, signInWithGoogle, logout } = useAuth();
+  const {
+    user, loading, userStatus, statusLoading, rejectionNote,
+    isAdmin, isApproved,
+    signInWithGoogle, registerWithEmail, signInWithEmail, resetPassword, logout,
+  } = useAuth();
   const {
     conversations, activeId, setActiveId,
     createConversation, saveMessages, deleteConversation,
@@ -26,9 +35,7 @@ export default function Home() {
 
   const activeIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    activeIdRef.current = activeId;
-  }, [activeId]);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
   const handleSend = useCallback(async (text: string) => {
     if (user && !activeIdRef.current) {
@@ -65,30 +72,66 @@ export default function Home() {
     activeIdRef.current = null;
   };
 
-  // Mobile back = go to welcome screen (clear messages)
   const handleBack = () => {
     clearMessages();
     setActiveId(null);
     activeIdRef.current = null;
   };
 
+  const handleEmailSignIn = async (email: string, password: string) => {
+    setAuthError('');
+    try { await signInWithEmail(email, password); }
+    catch (e: any) { setAuthError(e.message ?? 'Sign in failed'); throw e; }
+  };
+
+  const handleEmailRegister = async (email: string, password: string, name: string) => {
+    setAuthError('');
+    try { await registerWithEmail(email, password, name); }
+    catch (e: any) { setAuthError(e.message ?? 'Registration failed'); throw e; }
+  };
+
   const hasMessages = messages.length > 0;
 
-  return (
-    <div
-      className="flex flex-col overflow-hidden"
-      style={{
-        background: '#05050a',
-        height: '100dvh', // dvh = dynamic viewport height, handles mobile browser bars
-      }}
-    >
-      {/* Ambient glow */}
-      <div className="fixed pointer-events-none z-0 transition-all duration-[900ms]"
-        style={{
-          top: 0, left: 0, right: 0, height: '60vh',
-          background: `radial-gradient(ellipse 65% 55% at 50% -5%, ${currentMode.glow} 0%, transparent 100%)`,
-        }}
+  // Loading state
+  if (loading || statusLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ background: '#05050a' }}>
+        <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: currentMode.accent, borderTopColor: 'transparent' }} />
+      </div>
+    );
+  }
+
+  // Not logged in — show auth screen
+  if (!user) {
+    return (
+      <AuthScreen
+        currentMode={currentMode}
+        onGoogleSignIn={signInWithGoogle}
+        onEmailSignIn={handleEmailSignIn}
+        onEmailRegister={handleEmailRegister}
+        onResetPassword={resetPassword}
+        error={authError}
       />
+    );
+  }
+
+  // Logged in but not approved
+  if (!isApproved && userStatus && userStatus !== 'approved') {
+    return (
+      <ApprovalGate
+        status={userStatus}
+        rejectionNote={rejectionNote}
+        currentMode={currentMode}
+        onLogout={logout}
+        userEmail={user.email ?? ''}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col overflow-hidden" style={{ background: '#05050a', height: '100dvh' }}>
+      <div className="fixed pointer-events-none z-0 transition-all duration-[900ms]"
+        style={{ top: 0, left: 0, right: 0, height: '60vh', background: `radial-gradient(ellipse 65% 55% at 50% -5%, ${currentMode.glow} 0%, transparent 100%)` }} />
       <div className="fixed inset-0 pointer-events-none z-0 dot-grid" />
 
       <div className="relative z-10 flex flex-col h-full">
@@ -99,13 +142,12 @@ export default function Home() {
           onBack={handleBack}
           hasMessages={hasMessages}
           user={user}
-          authLoading={authLoading}
+          authLoading={false}
           onSignIn={signInWithGoogle}
           onSignOut={logout}
         />
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Desktop sidebar */}
           <Sidebar
             isOpen={sidebarOpen}
             currentMode={currentMode}
@@ -130,15 +172,10 @@ export default function Home() {
               onSuggestion={handleSend}
               onModeChange={handleModeChange}
             />
-            <InputBar
-              currentMode={currentMode}
-              isLoading={isLoading}
-              onSend={handleSend}
-            />
+            <InputBar currentMode={currentMode} isLoading={isLoading} onSend={handleSend} />
           </main>
         </div>
 
-        {/* Mobile bottom nav */}
         <MobileNav
           currentMode={currentMode}
           onOpenSidebar={() => setMobileSheet('history')}
@@ -148,7 +185,6 @@ export default function Home() {
         />
       </div>
 
-      {/* Mobile sheets */}
       {mobileSheet === 'history' && (
         <HistorySheet
           currentMode={currentMode}
@@ -171,6 +207,10 @@ export default function Home() {
           onModeChange={handleModeChange}
           onClose={() => setMobileSheet(null)}
         />
+      )}
+
+      {showProfile && user && (
+        <UserProfile uid={user.uid} currentMode={currentMode} onClose={() => setShowProfile(false)} />
       )}
     </div>
   );
