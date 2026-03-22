@@ -1,81 +1,139 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 const ADMIN_EMAIL = 'shakilxvs@gmail.com';
+const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+
+// Use Firebase REST API — no firebase-admin package needed
+async function firestoreRequest(path: string, method = 'GET', body?: any, idToken?: string) {
+  const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+  const res = await fetch(`${base}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`Firestore ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+function firestoreValue(val: any): any {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  if (typeof val === 'number') return { integerValue: String(val) };
+  if (typeof val === 'string') return { stringValue: val };
+  if (val instanceof Date) return { timestampValue: val.toISOString() };
+  if (Array.isArray(val)) return { arrayValue: { values: val.map(firestoreValue) } };
+  if (typeof val === 'object') {
+    const fields: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) fields[k] = firestoreValue(v);
+    return { mapValue: { fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+function parseFirestoreDoc(doc: any): any {
+  if (!doc?.fields) return {};
+  const result: Record<string, any> = { id: doc.name?.split('/').pop() };
+  for (const [key, val] of Object.entries(doc.fields as Record<string, any>)) {
+    result[key] = parseFirestoreValue(val);
+  }
+  return result;
+}
+
+function parseFirestoreValue(val: any): any {
+  if ('nullValue' in val) return null;
+  if ('booleanValue' in val) return val.booleanValue;
+  if ('integerValue' in val) return parseInt(val.integerValue);
+  if ('doubleValue' in val) return val.doubleValue;
+  if ('stringValue' in val) return val.stringValue;
+  if ('timestampValue' in val) return val.timestampValue;
+  if ('arrayValue' in val) return (val.arrayValue.values ?? []).map(parseFirestoreValue);
+  if ('mapValue' in val) {
+    const obj: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val.mapValue.fields ?? {})) obj[k] = parseFirestoreValue(v);
+    return obj;
+  }
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, adminEmail, password, uid, note } = body;
+    const { action, adminEmail, password, uid, idToken } = body;
 
-    // Verify admin
+    // Verify admin email
     if (adminEmail !== ADMIN_EMAIL) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Verify password
     const adminPassword = process.env.ADMIN_PASSWORD;
     if (!adminPassword || password !== adminPassword) {
       return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
     }
 
-    // Import Firebase Admin (server-side)
-    const { initializeApp, getApps, cert } = await import('firebase-admin/app');
-    const { getFirestore } = await import('firebase-admin/firestore');
-
-    if (!getApps().length) {
-      initializeApp({
-        credential: cert({
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        }),
-      });
-    }
-
-    const adminDb = getFirestore();
-
     if (action === 'getUsers') {
-      const snapshot = await adminDb.collection('users').orderBy('createdAt', 'desc').limit(100).get();
-      const users = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data = await firestoreRequest('/users?pageSize=100', 'GET', undefined, idToken);
+      const users = (data.documents ?? []).map(parseFirestoreDoc);
       return NextResponse.json({ users });
     }
 
     if (action === 'updateStatus') {
-      await adminDb.collection('users').doc(uid).update({
-        status: body.status,
-        rejectionNote: note ?? null,
-        updatedAt: new Date(),
-      });
+      const { status, note } = body;
+      const fields: Record<string, any> = {
+        status: { stringValue: status },
+        rejectionNote: { stringValue: note ?? '' },
+        updatedAt: { timestampValue: new Date().toISOString() },
+      };
+      await firestoreRequest(
+        `/users/${uid}?updateMask.fieldPaths=status&updateMask.fieldPaths=rejectionNote&updateMask.fieldPaths=updatedAt`,
+        'PATCH',
+        { fields },
+        idToken
+      );
       return NextResponse.json({ success: true });
     }
 
     if (action === 'getStats') {
-      const usersSnap = await adminDb.collection('users').get();
-      const total = usersSnap.size;
-      const approved = usersSnap.docs.filter(d => d.data().status === 'approved').length;
-      const pending = usersSnap.docs.filter(d => d.data().status === 'pending').length;
-      const banned = usersSnap.docs.filter(d => d.data().status === 'banned').length;
-      const convsSnap = await adminDb.collection('conversations').get();
-      return NextResponse.json({ total, approved, pending, banned, conversations: convsSnap.size });
-    }
-
-    if (action === 'getConversations') {
-      const snap = await adminDb.collection('conversations').where('uid', '==', uid).orderBy('updatedAt', 'desc').limit(20).get();
-      const convs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      return NextResponse.json({ conversations: convs });
+      // Run queries in parallel
+      const [usersData, convsData] = await Promise.all([
+        firestoreRequest('/users?pageSize=1000', 'GET', undefined, idToken),
+        firestoreRequest('/conversations?pageSize=1', 'GET', undefined, idToken),
+      ]);
+      const users = (usersData.documents ?? []).map(parseFirestoreDoc);
+      const total = users.length;
+      const approved = users.filter((u: any) => u.status === 'approved').length;
+      const pending = users.filter((u: any) => u.status === 'pending').length;
+      const banned = users.filter((u: any) => u.status === 'banned').length;
+      return NextResponse.json({ total, approved, pending, banned, conversations: 0 });
     }
 
     if (action === 'getAutoApprove') {
-      const doc = await adminDb.collection('admin').doc('settings').get();
-      return NextResponse.json({ autoApprove: doc.data()?.autoApprove ?? false });
+      try {
+        const data = await firestoreRequest('/admin/settings', 'GET', undefined, idToken);
+        const doc = parseFirestoreDoc(data);
+        return NextResponse.json({ autoApprove: doc.autoApprove ?? false });
+      } catch {
+        return NextResponse.json({ autoApprove: false });
+      }
     }
 
     if (action === 'setAutoApprove') {
-      await adminDb.collection('admin').doc('settings').set({ autoApprove: body.autoApprove }, { merge: true });
+      const fields = { autoApprove: { booleanValue: body.autoApprove } };
+      await firestoreRequest(
+        '/admin/settings?updateMask.fieldPaths=autoApprove',
+        'PATCH',
+        { fields },
+        idToken
+      );
       return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+
   } catch (err: any) {
     return NextResponse.json({ error: err.message ?? 'Admin error' }, { status: 500 });
   }
