@@ -111,35 +111,20 @@ export default function AdminPage() {
     setLoading(false);
   };
 
+  const [userProfile, setUserProfile] = useState<any>(null);
+
   const loadConversations = async (u: UserRow) => {
     setActivityUser(u);
     setConvLoading(true);
     setConversations([]);
+    setUserProfile(null);
     try {
-      // Query conversations for this user via Firestore REST
-      const token = idToken || await auth.currentUser?.getIdToken() || '';
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'xvsai-79a67';
-      const res = await fetch(
-        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/conversations?pageSize=20`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const docs = (data.documents ?? [])
-          .map((d: any) => {
-            const fields = d.fields ?? {};
-            return {
-              id: d.name?.split('/').pop(),
-              title: fields.title?.stringValue ?? 'Untitled',
-              mode: fields.mode?.stringValue ?? 'chat',
-              uid: fields.uid?.stringValue ?? '',
-              updatedAt: fields.updatedAt?.timestampValue ?? '',
-              msgCount: (fields.messages?.arrayValue?.values ?? []).length,
-            };
-          })
-          .filter((c: any) => c.uid === u.id);
-        setConversations(docs);
-      }
+      const [convsData, profileData] = await Promise.allSettled([
+        api('getConversations', { uid: u.id }),
+        api('getUserProfile', { uid: u.id }),
+      ]);
+      if (convsData.status === 'fulfilled') setConversations(convsData.value.conversations ?? []);
+      if (profileData.status === 'fulfilled') setUserProfile(profileData.value.profile ?? null);
     } catch {}
     setConvLoading(false);
   };
@@ -369,27 +354,63 @@ export default function AdminPage() {
               </div>
               <button onClick={() => setActivityUser(null)} style={{ color: 'rgba(255,255,255,0.4)' }}>✕</button>
             </div>
-            <div className="overflow-y-auto flex-1 p-3">
-              {convLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 size={20} className="animate-spin" style={{ color: '#818cf8' }} />
-                </div>
-              ) : conversations.length === 0 ? (
-                <p className="text-center py-8 text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No conversations yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {conversations.map(c => (
-                    <div key={c.id} className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <p className="text-sm text-white truncate">{c.title}</p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs capitalize px-2 py-0.5 rounded-full" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{c.mode}</span>
-                        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>{c.msgCount} messages</span>
-                        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : ''}</span>
+            <div className="overflow-y-auto flex-1 p-3 space-y-3">
+              {/* Profile info */}
+              {userProfile && (
+                <div className="px-3 py-3 rounded-xl" style={{ background: 'rgba(129,140,248,0.06)', border: '1px solid rgba(129,140,248,0.15)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#818cf8' }}>Profile Info</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {[
+                      ['Name', userProfile.displayName],
+                      ['Email', userProfile.email],
+                      ['Phone', userProfile.phone],
+                      ['Gender', userProfile.gender],
+                      ['DOB', userProfile.dob],
+                      ['Provider', userProfile.provider],
+                      ['Status', userProfile.status],
+                      ['Address', userProfile.address],
+                    ].filter(([, v]) => v).map(([label, value]) => (
+                      <div key={label as string}>
+                        <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
+                        <p className="text-xs text-white truncate">{value as string}</p>
                       </div>
+                    ))}
+                  </div>
+                  {userProfile.bio && (
+                    <div className="mt-2">
+                      <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Bio</p>
+                      <p className="text-xs text-white">{userProfile.bio}</p>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
+
+              {/* Conversations */}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-2 px-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  Conversations ({conversations.length})
+                </p>
+                {convLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 size={20} className="animate-spin" style={{ color: '#818cf8' }} />
+                  </div>
+                ) : conversations.length === 0 ? (
+                  <p className="text-center py-6 text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No conversations yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {conversations.map((c: any) => (
+                      <div key={c.id} className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <p className="text-sm text-white truncate">{c.title}</p>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="text-xs capitalize px-2 py-0.5 rounded-full" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{c.mode}</span>
+                          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>{c.msgCount} messages</span>
+                          {c.updatedAt && <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>{new Date(c.updatedAt).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
