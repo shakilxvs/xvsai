@@ -1,7 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import {
-  X, Plus, MessageSquare, Brain, Zap, Search, Code2, Image, Flame,
+  X, Plus, MessageSquare, Brain, Zap, Search, Code2, Image, Flame, Shield,
   Clock, Trash2, LogIn, Sparkles, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import { Mode, ModeConfig } from '@/app/lib/types';
@@ -18,6 +18,7 @@ const ICONS: Record<Mode, React.ReactNode> = {
   code:     <Code2 size={16} strokeWidth={1.75} />,
   image:    <Image size={16} strokeWidth={1.75} />,
   open:     <Flame size={16} strokeWidth={1.75} />,
+  security: <Shield size={18} strokeWidth={1.75} />,
 };
 
 function timeAgo(date: Date): string {
