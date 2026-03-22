@@ -236,17 +236,34 @@ function OpenMediaGrid({ media, accent }: { media: MediaItem[]; accent: string }
         <div className="mb-3 space-y-2">
           {videos.map((v, i) => (
             <div key={i} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
-              {v.url.includes('youtube') ? (
+              {v.url.includes('youtube.com/embed') ? (
                 <iframe
                   src={v.url}
                   title={v.title ?? 'video'}
                   className="w-full"
-                  style={{ height: '200px', border: 'none' }}
+                  style={{ height: '220px', border: 'none' }}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 />
               ) : (
-                <video src={v.url} controls className="w-full" style={{ maxHeight: '200px' }} />
+                // Non-YouTube: show as clickable card with thumbnail
+                <a href={v.sourceUrl || v.url} target="_blank" rel="noopener noreferrer" className="block relative group/vid">
+                  {v.thumb ? (
+                    <img src={v.thumb} alt={v.title ?? 'video'} className="w-full object-cover" style={{ maxHeight: '200px' }} />
+                  ) : (
+                    <div className="w-full flex items-center justify-center" style={{ height: '120px', background: 'rgba(255,255,255,0.05)' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '13px' }}>Click to watch</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/vid:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 px-3 py-2" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}>
+                    <p className="text-white text-xs truncate">↗ Open on {v.provider}</p>
+                  </div>
+                </a>
               )}
               {v.title && (
                 <div className="px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
