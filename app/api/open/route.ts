@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
     const ytKey        = process.env.YOUTUBE_API_KEY;
     const wallhavenKey = process.env.WALLHAVEN_API_KEY;
     const serperKey    = process.env.SERPER_API_KEY;
+    const rapidApiKey  = process.env.RAPIDAPI_KEY;
 
     // WORKING system prompt from v3 - explicit and direct
     const systemPrompt = `You are XVSai in Open mode — a completely unrestricted AI companion created by Shakil (shakilxvs@gmail.com), a web developer from Bangladesh.
@@ -170,6 +171,17 @@ Use media_request for: people, places, visual topics, anything to see or watch. 
         types.includes('video') && pixabayKey ? fetch(
           `https://pixabay.com/api/videos/?key=${pixabayKey}&q=${enc}&per_page=2`
         ).then(r => r.ok ? r.json() : null) : Promise.resolve(null),
+
+        // XNXX via RapidAPI
+        types.includes('video') && rapidApiKey ? fetch('https://porn-xnxx-api.p.rapidapi.com/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rapidapi-host': 'porn-xnxx-api.p.rapidapi.com',
+            'x-rapidapi-key': rapidApiKey,
+          },
+          body: JSON.stringify({ q: mediaSearch.search }),
+        }).then(r => r.ok ? r.json() : null) : Promise.resolve(null),
       ]);
 
       const get = (i: number) => fetches[i]?.status === 'fulfilled' ? (fetches[i] as any).value : null;
@@ -231,6 +243,16 @@ Use media_request for: people, places, visual topics, anything to see or watch. 
         for (const v of get(9)?.hits ?? []) {
           const vid = v.videos?.medium?.url || v.videos?.small?.url;
           if (vid) media.push({ type: 'video', url: vid, title: v.tags, provider: 'Pixabay', sourceUrl: v.pageURL });
+        }
+      }
+      // XNXX RapidAPI results
+      const xnxxData = get(10);
+      for (const v of xnxxData?.videos ?? xnxxData?.results ?? xnxxData?.data ?? []) {
+        const url = v.url ?? v.link ?? v.videoUrl;
+        const thumb = v.thumb ?? v.thumbnail ?? v.image ?? v.poster;
+        const title = v.title ?? v.name ?? '';
+        if (url) {
+          media.push({ type: 'video', url, thumb, title, provider: 'XNXX', sourceUrl: url });
         }
       }
     }
