@@ -37,6 +37,9 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [noteText, setNoteText] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [activityUser, setActivityUser] = useState<UserRow | null>(null);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [convLoading, setConvLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'banned'>('all');
 
   // Check if already logged in as admin
@@ -106,6 +109,39 @@ export default function AdminPage() {
       if (settingsData.status === 'fulfilled') setAutoApprove(settingsData.value.autoApprove ?? false);
     } catch {}
     setLoading(false);
+  };
+
+  const loadConversations = async (u: UserRow) => {
+    setActivityUser(u);
+    setConvLoading(true);
+    setConversations([]);
+    try {
+      // Query conversations for this user via Firestore REST
+      const token = idToken || await auth.currentUser?.getIdToken() || '';
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'xvsai-79a67';
+      const res = await fetch(
+        `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/conversations?pageSize=20`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const docs = (data.documents ?? [])
+          .map((d: any) => {
+            const fields = d.fields ?? {};
+            return {
+              id: d.name?.split('/').pop(),
+              title: fields.title?.stringValue ?? 'Untitled',
+              mode: fields.mode?.stringValue ?? 'chat',
+              uid: fields.uid?.stringValue ?? '',
+              updatedAt: fields.updatedAt?.timestampValue ?? '',
+              msgCount: (fields.messages?.arrayValue?.values ?? []).length,
+            };
+          })
+          .filter((c: any) => c.uid === u.id);
+        setConversations(docs);
+      }
+    } catch {}
+    setConvLoading(false);
   };
 
   const updateStatus = async (uid: string, status: string, note?: string) => {
@@ -281,7 +317,7 @@ export default function AdminPage() {
         ) : (
           <div className="space-y-2">
             {filteredUsers.map(u => (
-              <div key={u.id} className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div key={u.id} className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer hover:bg-white/[0.05] transition-all" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }} onClick={() => loadConversations(u)}>
                 <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold text-white" style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)' }}>
                   {(u.displayName || u.email || '?').charAt(0).toUpperCase()}
                 </div>
@@ -321,6 +357,43 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      {/* Activity modal */}
+      {activityUser && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setActivityUser(null)}>
+          <div className="w-full md:max-w-[500px] max-h-[80vh] flex flex-col rounded-t-2xl md:rounded-2xl" style={{ background: '#0d0d14', border: '1px solid rgba(255,255,255,0.1)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: 'rgba(255,255,255,0.07)' }}>
+              <div>
+                <h3 className="text-base font-semibold text-white">{activityUser.displayName || 'User'}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{activityUser.email} · {conversations.length} conversations</p>
+              </div>
+              <button onClick={() => setActivityUser(null)} style={{ color: 'rgba(255,255,255,0.4)' }}>✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-3">
+              {convLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={20} className="animate-spin" style={{ color: '#818cf8' }} />
+                </div>
+              ) : conversations.length === 0 ? (
+                <p className="text-center py-8 text-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>No conversations yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {conversations.map(c => (
+                    <div key={c.id} className="px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <p className="text-sm text-white truncate">{c.title}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs capitalize px-2 py-0.5 rounded-full" style={{ background: 'rgba(129,140,248,0.15)', color: '#818cf8' }}>{c.mode}</span>
+                        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>{c.msgCount} messages</span>
+                        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Ban modal */}
       {selectedUser && (
