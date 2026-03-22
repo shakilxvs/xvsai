@@ -286,11 +286,16 @@ MEDIA RULES:
     }
 
     if (!textContent) {
-      textContent = secCtx
-        ? `Security scan complete:\n\`\`\`json\n${secCtx}\n\`\`\``
-        : isMediaQ
-          ? 'Searching media for you...'
-          : `Search results: [Google](https://www.google.com/search?q=${encodeURIComponent(query)}) · [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(query)}) · [Searx](https://searx.be/search?q=${encodeURIComponent(query)})`;
+      if (secCtx) {
+        textContent = `Security scan complete:\n\`\`\`json\n${secCtx}\n\`\`\``;
+      } else if (isMediaQ) {
+        textContent = 'Searching media for you...';
+      } else if (isCodeQ) {
+        textContent = 'AI models are temporarily rate-limited from heavy usage. Please try again in 2-3 minutes — all models reset hourly.';
+      } else {
+        // For factual queries only, show search links as last resort
+        textContent = `I'm temporarily rate-limited across all AI providers. Here are some direct search links:\n\n[Google](https://www.google.com/search?q=${encodeURIComponent(query)}) · [DuckDuckGo](https://duckduckgo.com/?q=${encodeURIComponent(query)}) · [Searx](https://searx.be/search?q=${encodeURIComponent(query)})`;
+      }
     }
 
     // ── Extract AI media request ──────────────────────────
