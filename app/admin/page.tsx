@@ -69,7 +69,7 @@ export default function AdminPage() {
       const provider = new GoogleAuthProvider();
       const cred = await signInWithPopup(auth, provider);
       if (cred.user.email !== ADMIN_EMAIL) {
-        setAuthErr('Only shakilxvs@gmail.com can access admin.');
+        setAuthErr('Access restricted. You are not authorized.');
         await auth.signOut();
         return;
       }
