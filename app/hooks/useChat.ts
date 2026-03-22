@@ -126,12 +126,13 @@ export function useChat() {
             m.id === aiId ? { ...m, content: data.error, model: 'Error', provider: '' } : m
           ));
         } else {
+          const responseText = data.text?.trim() || 'No response received. Please try again.';
           updateMessages(prev => prev.map(m =>
             m.id === aiId ? {
               ...m,
-              content: data.text,
+              content: responseText,
               openMedia: data.media?.length > 0 ? data.media : undefined,
-              model: 'Open AI',
+              model: 'Open Mode',
               provider: 'open',
             } : m
           ));
