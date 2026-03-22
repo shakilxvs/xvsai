@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
     const giphyKey       = process.env.GIPHY_API_KEY;
     const wallhavenKey   = process.env.WALLHAVEN_API_KEY;
     const imgurClientId  = process.env.IMGUR_CLIENT_ID;
-    const freepikKey     = process.env.FREEPIK_API_KEY;
+    const freepikKey       = process.env.FREEPIK_API_KEY;
+    const serperKey        = process.env.SERPER_API_KEY;
+    const pollinationsKey  = process.env.POLLINATIONS_API_KEY;
 
     // ── Step 1: AI classifies intent ─────────────────────
     let useRealPhoto = false;
@@ -340,6 +342,31 @@ export async function POST(req: NextRequest) {
           photographer: p.author?.name,
           photoUrl: p.url,
         });
+      }
+
+      // 22. Serper Google Images — searches across entire internet including Pinterest
+      if (serperKey) {
+        try {
+          const serperRes = await fetch('https://google.serper.dev/images', {
+            method: 'POST',
+            headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ q: cleanPrompt, num: 6 }),
+          });
+          if (serperRes.ok) {
+            const serperData = await serperRes.json();
+            for (const img of serperData.images ?? []) {
+              if (img.imageUrl && img.imageUrl.startsWith('http')) {
+                images.push({
+                  url: img.imageUrl,
+                  provider: img.source ?? 'Google Images',
+                  providerUrl: 'https://google.com',
+                  photographer: img.title,
+                  photoUrl: img.link,
+                });
+              }
+            }
+          }
+        } catch {}
       }
 
       if (images.length > 0) {
