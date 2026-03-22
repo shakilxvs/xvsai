@@ -85,7 +85,7 @@ export default function AdminPage() {
     setAuthErr('');
     if (!password) { setAuthErr('Enter password'); return; }
     try {
-      await api('getStats');
+      await api('verify');
       setStep('dashboard');
       loadData();
     } catch (e: any) {
@@ -155,7 +155,7 @@ export default function AdminPage() {
               <Lock size={20} className="text-white" />
             </div>
             <h1 className="text-xl font-bold text-white">XVSai Admin</h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Sign in with your admin Google account</p>
+            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Admin access only</p>
           </div>
           {authErr && <p className="text-sm mb-3 text-center" style={{ color: '#f87171' }}>{authErr}</p>}
           <button onClick={handleGoogleSignIn}
