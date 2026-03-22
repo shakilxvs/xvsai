@@ -131,7 +131,7 @@ export default function Home() {
   return (
     <div className="flex flex-col overflow-hidden" style={{ background: '#05050a', height: '100dvh' }}>
       <div className="fixed pointer-events-none z-0 transition-all duration-[900ms]"
-        style={{ top: 0, left: 0, right: 0, height: '60vh', background: `radial-gradient(ellipse 65% 55% at 50% -5%, ${currentMode.glow} 0%, transparent 100%)` }} />
+        style={{ top: 0, left: 0, right: 0, height: '60vh', background: `radial-gradient(ellipse 65% 55% at 50% -5%, ${currentMode.glow} 0%, transparent 100%)`, animation: 'fadeIn 0.5s ease both' }} />
       <div className="fixed inset-0 pointer-events-none z-0 dot-grid" />
 
       <div className="relative z-10 flex flex-col h-full">
