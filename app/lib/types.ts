@@ -1,4 +1,4 @@
-export type Mode = 'chat' | 'deep' | 'fast' | 'research' | 'code' | 'image' | 'open';
+export type Mode = 'chat' | 'deep' | 'fast' | 'research' | 'code' | 'image' | 'open' | 'security';
 export type UserStatus = 'pending' | 'approved' | 'banned' | 'rejected';
 
 export interface Source {
