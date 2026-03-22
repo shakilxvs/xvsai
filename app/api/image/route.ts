@@ -16,8 +16,6 @@ export async function POST(req: NextRequest) {
     if (!prompt) return NextResponse.json({ error: 'No prompt provided' }, { status: 400 });
 
     const groqKey        = process.env.GROQ_API_KEY;
-    const stabilityKey   = process.env.STABILITY_API_KEY;
-    const pollinationsKey = process.env.POLLINATIONS_API_KEY;
     const pexelsKey      = process.env.PEXELS_API_KEY;
     const unsplashKey    = process.env.UNSPLASH_ACCESS_KEY;
     const pixabayKey     = process.env.PIXABAY_API_KEY;
@@ -38,47 +36,10 @@ export async function POST(req: NextRequest) {
       .replace(/^(generate|make|create|draw|render|produce|paint|illustrate)\s+(a|an|the|me)?\s*/i, '')
       .trim();
 
-    if (groqKey) {
-      try {
-        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              {
-                role: 'system',
-                content: `Classify image requests. Reply JSON only.
-{"type":"real","query":"search term"} — user wants to FIND/SHOW/SEE existing photos/wallpapers
-{"type":"ai","query":"description"} — user wants to CREATE/GENERATE/DRAW/MAKE an image
+    // cleanPrompt already set above
 
-"show mountain" → real · "phone wallpaper" → real · "dog" → real
-"boat" → real · "sunset" → real · "4k wallpaper" → real
-"generate dragon" → ai · "create city" → ai · "draw a cat" → ai`
-              },
-              { role: 'user', content: prompt },
-            ],
-            max_tokens: 80, temperature: 0,
-          }),
-        });
-        if (r.ok) {
-          const d = await r.json();
-          const raw = d.choices?.[0]?.message?.content?.trim() ?? '';
-          const match = raw.match(/\{[^}]+\}/);
-          if (match) {
-            const parsed = JSON.parse(match[0]);
-            useRealPhoto = parsed.type === 'real';
-            if (parsed.query) cleanPrompt = parsed.query;
-          }
-        }
-      } catch {}
-    }
-
-    // Default to real photo search unless user explicitly asks to generate/create/draw
-    if (!useRealPhoto) {
-      const forceAI = /^(generate|make|create|draw|render|produce|paint|illustrate|design)\s/i.test(prompt.trim());
-      if (!forceAI) useRealPhoto = true;
-    }
+    // Always use real photo search
+    useRealPhoto = true;
 
     // ── Step 2a: Real photos from all sources ─────────────
     if (useRealPhoto) {
@@ -381,38 +342,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Step 2b: AI generation → Stability AI → Pollinations fallback ─
-    if (stabilityKey) {
+    // ── No images found fallback ────────────────────────
+    // Try one more time with Serper if we have no results
+    if (serperKey) {
       try {
-        const form = new FormData();
-        form.append('prompt', cleanPrompt);
-        form.append('output_format', 'jpeg');
-        form.append('aspect_ratio', '1:1');
-        const r = await fetch('https://api.stability.ai/v2beta/stable-image/generate/core', {
+        const r = await fetch('https://google.serper.dev/images', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${stabilityKey}`, 'Accept': 'image/*' },
-          body: form,
+          headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q: cleanPrompt, num: 8 }),
         });
         if (r.ok) {
-          const buffer = await r.arrayBuffer();
-          const base64 = Buffer.from(buffer).toString('base64');
-          return NextResponse.json({ type: 'single', imageUrl: `data:image/jpeg;base64,${base64}`, provider: 'Stability AI', prompt: cleanPrompt });
+          const d = await r.json();
+          const imgs = (d.images ?? [])
+            .filter((img: any) => img.imageUrl?.startsWith('http'))
+            .map((img: any) => ({
+              url: img.imageUrl,
+              provider: img.source ?? 'Google Images',
+              providerUrl: 'https://google.com',
+              photographer: img.title,
+              photoUrl: img.link,
+            }));
+          if (imgs.length > 0) {
+            return NextResponse.json({ type: 'gallery', images: imgs, prompt: cleanPrompt });
+          }
         }
       } catch {}
     }
-
-    // ── Fallback: Pollinations FLUX with API key ─────────
-    const encoded2 = encodeURIComponent(cleanPrompt);
-    const seed2 = Math.floor(Math.random() * 999999);
-    const pollinationsUrl = pollinationsKey
-      ? `https://image.pollinations.ai/prompt/${encoded2}?model=flux&width=1024&height=1024&nologo=true&seed=${seed2}&token=${pollinationsKey}`
-      : `https://image.pollinations.ai/prompt/${encoded2}?model=flux&width=1024&height=1024&nologo=true&seed=${seed2}`;
-    return NextResponse.json({
-      type: 'single',
-      imageUrl: pollinationsUrl,
-      provider: 'FLUX AI',
-      prompt: cleanPrompt,
-    });
+    return NextResponse.json({ error: 'No images found. Try a different search term.' }, { status: 404 });
 
   } catch {
     return NextResponse.json({ error: 'Something went wrong.' }, { status: 500 });
