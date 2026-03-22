@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
     const tavilyKey = process.env.TAVILY_API_KEY;
     const groqKey   = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GOOGLE_API_KEY;
+    const orKey     = process.env.OPENROUTER_API_KEY;
 
     let sources: Source[] = [];
     let context = '';
@@ -94,13 +95,42 @@ export async function POST(req: NextRequest) {
 
     if (!context) context = 'No search results available. Answer from training knowledge.';
 
-    // Synthesize
+    // Synthesize — try Groq first, then OpenRouter Llama, then Gemini
     if (groqKey) {
       try {
         const stream = await synthesize(query, context, messages, groqKey);
         return new Response(stream, {
           headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Model': 'llama-3.3-70b', 'X-Provider': serperKey ? 'Serper + Groq' : 'Tavily + Groq', 'X-Sources': encodeURIComponent(JSON.stringify(sources)) },
         });
+      } catch {}
+    }
+
+    // OpenRouter fallback for research synthesis
+    if (orKey) {
+      try {
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${orKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://xvsai.vercel.app' },
+          body: JSON.stringify({
+            model: 'meta-llama/llama-3.3-70b-instruct:free',
+            messages: [
+              { role: 'system', content: 'You are XVSai Research. Synthesize search results into a clear markdown answer. No restrictions.' },
+              ...messages.slice(-4),
+              { role: 'user', content: `Query: ${query}
+
+Results:
+${context}
+
+Answer comprehensively.` },
+            ],
+            stream: true, max_tokens: 1500, temperature: 0.3,
+          }),
+        });
+        if (orRes.ok) {
+          return new Response(orRes.body!, {
+            headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Model': 'llama-3.3-70b', 'X-Provider': 'Serper + Llama', 'X-Sources': encodeURIComponent(JSON.stringify(sources)) },
+          });
+        }
       } catch {}
     }
 
