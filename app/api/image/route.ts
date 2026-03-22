@@ -74,8 +74,10 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    if (!groqKey) {
-      useRealPhoto = /^(show|find|get|search|look|photo|picture|image of|see|wallpaper|background)/i.test(prompt.trim());
+    // Default to real photo search unless user explicitly asks to generate/create/draw
+    if (!useRealPhoto) {
+      const forceAI = /^(generate|make|create|draw|render|produce|paint|illustrate|design)\s/i.test(prompt.trim());
+      if (!forceAI) useRealPhoto = true;
     }
 
     // ── Step 2a: Real photos from all sources ─────────────
