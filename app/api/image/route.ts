@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
     const imgurClientId  = process.env.IMGUR_CLIENT_ID;
     const freepikKey       = process.env.FREEPIK_API_KEY;
     const serperKey        = process.env.SERPER_API_KEY;
-    const pollinationsKey  = process.env.POLLINATIONS_API_KEY;
 
     // ── Step 1: AI classifies intent ─────────────────────
     let useRealPhoto = false;
