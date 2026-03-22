@@ -2,6 +2,7 @@
 import { useState, useRef, KeyboardEvent } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { ModeConfig } from '@/app/lib/types';
+import VoiceInput from './VoiceInput';
 
 export default function InputBar({ currentMode, isLoading, onSend }: {
   currentMode: ModeConfig;
@@ -29,13 +30,16 @@ export default function InputBar({ currentMode, isLoading, onSend }: {
     ref.current.style.height = Math.min(ref.current.scrollHeight, 140) + 'px';
   };
 
+  const handleVoice = (transcript: string) => {
+    setValue(transcript);
+    setTimeout(() => ref.current?.focus(), 100);
+  };
+
   const active = Boolean(value.trim()) && !isLoading;
 
   return (
-    <div
-      className="flex-shrink-0 px-3 pt-2 input-pad md:pb-5"
-      style={{ background: 'rgba(5,5,10,0.95)', backdropFilter: 'blur(20px)' }}
-    >
+    <div className="flex-shrink-0 px-3 pt-2 input-pad md:pb-5"
+      style={{ background: 'rgba(5,5,10,0.95)', backdropFilter: 'blur(20px)' }}>
       <div className="max-w-[700px] mx-auto">
         <div
           className="flex items-center gap-2 px-4 rounded-2xl transition-all duration-200"
@@ -46,6 +50,11 @@ export default function InputBar({ currentMode, isLoading, onSend }: {
             minHeight: '54px',
           }}
         >
+          <VoiceInput
+            onTranscript={handleVoice}
+            accent={currentMode.accent}
+            disabled={isLoading}
+          />
           <textarea
             ref={ref}
             value={value}
@@ -55,12 +64,7 @@ export default function InputBar({ currentMode, isLoading, onSend }: {
             rows={1}
             disabled={isLoading}
             className="flex-1 bg-transparent resize-none outline-none max-h-[140px] disabled:opacity-40 py-3.5"
-            style={{
-              fontSize: '16px', // 16px prevents iOS zoom
-              lineHeight: '1.55',
-              color: '#e8e8f0',
-              caretColor: currentMode.accent,
-            }}
+            style={{ fontSize: '16px', lineHeight: '1.55', color: '#e8e8f0', caretColor: currentMode.accent }}
           />
           <button
             onClick={send}
@@ -71,8 +75,6 @@ export default function InputBar({ currentMode, isLoading, onSend }: {
             <ArrowUp size={16} strokeWidth={2.5} />
           </button>
         </div>
-
-        {/* Desktop hint only */}
         <div className="hidden md:flex items-center justify-center mt-2 gap-2">
           <div className="w-1 h-1 rounded-full" style={{ background: currentMode.accent, opacity: 0.45 }} />
           <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>
