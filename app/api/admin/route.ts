@@ -129,6 +129,38 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
+    if (action === 'getConversations') {
+      // Query ALL conversations and filter by uid
+      try {
+        const data = await firestoreRequest(
+          `/conversations?pageSize=200`,
+          'GET', undefined, idToken
+        );
+        const all = (data.documents ?? []).map(parseFirestoreDoc);
+        const userConvs = all
+          .filter((c: any) => c.uid === uid)
+          .map((c: any) => ({
+            id: c.id,
+            title: c.title ?? 'Untitled',
+            mode: c.mode ?? 'chat',
+            updatedAt: c.updatedAt ?? null,
+            msgCount: Array.isArray(c.messages) ? c.messages.length : 0,
+          }));
+        return NextResponse.json({ conversations: userConvs });
+      } catch (e: any) {
+        return NextResponse.json({ conversations: [], error: e.message });
+      }
+    }
+
+    if (action === 'getUserProfile') {
+      try {
+        const data = await firestoreRequest(`/users/${uid}`, 'GET', undefined, idToken);
+        return NextResponse.json({ profile: parseFirestoreDoc(data) });
+      } catch {
+        return NextResponse.json({ profile: null });
+      }
+    }
+
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
 
   } catch (err: any) {
