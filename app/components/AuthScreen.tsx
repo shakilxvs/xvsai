@@ -52,20 +52,7 @@ export default function AuthScreen({ currentMode, onGoogleSignIn, onEmailSignIn,
     setLoading(false);
   };
 
-  const Field = ({ icon, placeholder, value, onChange, type = 'text' }: any) => (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-      <span style={{ color: 'rgba(255,255,255,0.35)' }}>{icon}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="flex-1 bg-transparent outline-none text-white placeholder-white/30"
-        style={{ fontSize: '15px' }}
-        onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-      />
-    </div>
-  );
+
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#05050a' }}>
@@ -103,9 +90,31 @@ export default function AuthScreen({ currentMode, onGoogleSignIn, onEmailSignIn,
 
           {/* Fields */}
           {view === 'register' && (
-            <Field icon={<User size={16} />} placeholder="Full name" value={name} onChange={setName} />
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <User size={16} style={{ color: 'rgba(255,255,255,0.35)' }} />
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Full name"
+                className="flex-1 bg-transparent outline-none text-white placeholder-white/30"
+                style={{ fontSize: '16px' }}
+                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              />
+            </div>
           )}
-          <Field icon={<Mail size={16} />} placeholder="Email address" value={email} onChange={setEmail} type="email" />
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <Mail size={16} style={{ color: 'rgba(255,255,255,0.35)' }} />
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="Email address"
+              className="flex-1 bg-transparent outline-none text-white placeholder-white/30"
+              style={{ fontSize: '16px' }}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            />
+          </div>
           {view !== 'reset' && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <Lock size={16} style={{ color: 'rgba(255,255,255,0.35)' }} />
