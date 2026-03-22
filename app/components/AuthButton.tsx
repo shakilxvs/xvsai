@@ -7,9 +7,10 @@ interface Props {
   loading: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
+  onProfile?: () => void;
 }
 
-export default function AuthButton({ user, loading, onSignIn, onSignOut }: Props) {
+export default function AuthButton({ user, loading, onSignIn, onSignOut, onProfile }: Props) {
   if (loading) {
     return (
       <div className="w-8 h-8 flex items-center justify-center">
