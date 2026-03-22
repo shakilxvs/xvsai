@@ -1,5 +1,5 @@
 'use client';
-import { MessageSquare, Brain, Zap, Search, Code2, Image, Flame, History, Plus } from 'lucide-react';
+import { MessageSquare, Brain, Zap, Search, Code2, Image, Flame, History, Plus, Shield } from 'lucide-react';
 import { Mode, ModeConfig } from '@/app/lib/types';
 import { MODES } from '@/app/lib/models';
 
@@ -11,6 +11,7 @@ const MODE_ICONS: Record<Mode, React.ReactNode> = {
   code:     <Code2 size={18} strokeWidth={1.75} />,
   image:    <Image size={18} strokeWidth={1.75} />,
   open:     <Flame size={18} strokeWidth={1.75} />,
+  security: <Shield size={18} strokeWidth={1.75} />,
 };
 
 interface Props {
