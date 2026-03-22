@@ -14,65 +14,40 @@ interface Props {
   authLoading: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
+  onProfile?: () => void;
 }
 
 export default function Header({
   currentMode, sidebarOpen, onToggle, onBack, hasMessages = false,
-  user, authLoading, onSignIn, onSignOut,
+  user, authLoading, onSignIn, onSignOut, onProfile,
 }: Props) {
   return (
-    <header
-      className="flex-shrink-0 flex items-center px-3 md:px-4 gap-3 z-20"
-      style={{
-        height: '52px',
-        paddingTop: 'env(safe-area-inset-top)',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        background: 'rgba(5,5,10,0.92)',
-        backdropFilter: 'blur(20px)',
-      }}
-    >
+    <header className="flex-shrink-0 flex items-center px-3 md:px-4 gap-3 z-20"
+      style={{ height: '52px', paddingTop: 'env(safe-area-inset-top)', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(5,5,10,0.92)', backdropFilter: 'blur(20px)' }}>
       <div className="w-8 flex items-center">
-        <button
-          onClick={onToggle}
+        <button onClick={onToggle}
           className="hidden md:flex w-8 h-8 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06]"
-          style={{ color: 'rgba(255,255,255,0.3)' }}
-        >
+          style={{ color: 'rgba(255,255,255,0.3)' }}>
           <PanelLeft size={16} />
         </button>
-
         {hasMessages && onBack && (
-          <button
-            onClick={onBack}
-            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg transition-colors active:bg-white/[0.06]"
-            style={{ color: 'rgba(255,255,255,0.6)' }}
-          >
+          <button onClick={onBack}
+            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg active:bg-white/[0.06]"
+            style={{ color: 'rgba(255,255,255,0.6)' }}>
             <ArrowLeft size={20} strokeWidth={2} />
           </button>
         )}
       </div>
 
       <div className="flex items-center gap-2">
-        <div
-          className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-white transition-all duration-500"
-          style={{ background: currentMode.gradient }}
-        >
-          X
-        </div>
-        <span className="text-[15px] font-semibold tracking-tight"
-          style={{ color: 'rgba(255,255,255,0.7)' }}>
-          XVSai
-        </span>
+        <div className="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold text-white transition-all duration-500"
+          style={{ background: currentMode.gradient }}>X</div>
+        <span className="text-[15px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.7)' }}>XVSai</span>
       </div>
 
       <div className="flex-1 flex justify-center">
-        <div
-          className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-500"
-          style={{
-            background: `${currentMode.accent}12`,
-            color: currentMode.accent,
-            border: `1px solid ${currentMode.accent}22`,
-          }}
-        >
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium transition-all duration-500"
+          style={{ background: `${currentMode.accent}12`, color: currentMode.accent, border: `1px solid ${currentMode.accent}22` }}>
           {currentMode.label}
         </div>
       </div>
@@ -82,7 +57,7 @@ export default function Header({
           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.18)' }}>Online</span>
         </div>
-        <AuthButton user={user} loading={authLoading} onSignIn={onSignIn} onSignOut={onSignOut} />
+        <AuthButton user={user} loading={authLoading} onSignIn={onSignIn} onSignOut={onSignOut} onProfile={onProfile} />
       </div>
     </header>
   );
