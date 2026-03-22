@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
 
     const groqKey        = process.env.GROQ_API_KEY;
     const stabilityKey   = process.env.STABILITY_API_KEY;
+    const pollinationsKey = process.env.POLLINATIONS_API_KEY;
     const pexelsKey      = process.env.PEXELS_API_KEY;
     const unsplashKey    = process.env.UNSPLASH_ACCESS_KEY;
     const pixabayKey     = process.env.PIXABAY_API_KEY;
@@ -399,12 +400,15 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // ── Fallback: Pollinations FLUX (always free, no key) ─
-    const encoded = encodeURIComponent(cleanPrompt);
-    const seed = Math.floor(Math.random() * 999999);
+    // ── Fallback: Pollinations FLUX with API key ─────────
+    const encoded2 = encodeURIComponent(cleanPrompt);
+    const seed2 = Math.floor(Math.random() * 999999);
+    const pollinationsUrl = pollinationsKey
+      ? `https://image.pollinations.ai/prompt/${encoded2}?model=flux&width=1024&height=1024&nologo=true&seed=${seed2}&token=${pollinationsKey}`
+      : `https://image.pollinations.ai/prompt/${encoded2}?model=flux&width=1024&height=1024&nologo=true&seed=${seed2}`;
     return NextResponse.json({
       type: 'single',
-      imageUrl: `https://image.pollinations.ai/prompt/${encoded}?model=flux&width=1024&height=1024&nologo=true&seed=${seed}`,
+      imageUrl: pollinationsUrl,
       provider: 'FLUX AI',
       prompt: cleanPrompt,
     });
