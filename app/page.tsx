@@ -145,6 +145,7 @@ export default function Home() {
           authLoading={false}
           onSignIn={signInWithGoogle}
           onSignOut={logout}
+          onProfile={() => setShowProfile(true)}
         />
 
         <div className="flex flex-1 overflow-hidden">
