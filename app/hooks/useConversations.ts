@@ -90,7 +90,7 @@ export function useConversations(user: User | null) {
       provider: m.provider ?? null,
       imageUrl: m.imageUrl ?? null,
       images: m.images ?? null,
-openMedia: m.openMedia ?? null,
+      openMedia: m.openMedia ?? null,
       sources: m.sources ?? [],
       timestamp: m.timestamp,
     }));
